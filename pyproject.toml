@@ -1,0 +1,16 @@
+[project]
+name = "river"
+version = "0.1.0"
+description = "A mono repo for river: includes SDK, controller, and runner."
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+requires-python = ">=3.12"
+readme = "README.md"
+
+[tool.setuptools.packages.find]
+where = ["sdk", "controller", "runner"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta" 
