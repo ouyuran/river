@@ -19,6 +19,18 @@ class Job:
         if upstreams:
             self._join(upstreams)
 
+    def run(self, validate=True):
+        # TODO: this could be a problem for async jobs
+        if self.status == Job.Status.RUNNING:
+            raise RuntimeError(f"Job '{self.name}' is already running.")
+
+        if validate:
+            self._validate_all()
+
+        if not self._run_already_finished() and not self._should_skip_due_to_upstream():
+            self._execute_main()
+        return self.status, self.result
+
     def _join(self, upstreams: list['Job']):
         for job in upstreams:
             cycle_path = self._find_cycle_path(job, self)
@@ -79,34 +91,36 @@ class Job:
         for job in self._upstreams:
             job._validate_all(visited)
 
-    def run(self, validate=True):
-        if self.status in (Job.Status.SUCCESS, Job.Status.FAILED, Job.Status.SKIPPED):
-            return self.status, self.result
-        if self.status == Job.Status.RUNNING:
-            raise RuntimeError(f"Job '{self.name}' is already running.")
-        if validate:
-            self._validate_all()
+    def _run_already_finished(self):
+        return self.status in (Job.Status.SUCCESS, Job.Status.FAILED, Job.Status.SKIPPED)
+
+    def _should_skip_due_to_upstream(self):
         for job in self._upstreams:
             job.run(validate=False)
             if job.status in (Job.Status.FAILED, Job.Status.SKIPPED):
                 self.status = Job.Status.SKIPPED
                 self.result = None
-                return self.status, None
+                return True
+        return False
+
+    def _prepare_main_kwargs(self):
+        upstreams_by_name = self._collect_all_upstreams()
+        sig = inspect.signature(self.main)
+        kwargs = {}
+        for param in sig.parameters.values():
+            if param.name == 'self':
+                kwargs['self'] = self
+            elif param.name in upstreams_by_name:
+                kwargs[param.name] = upstreams_by_name[param.name]
+        return kwargs
+
+    def _execute_main(self):
         self.status = Job.Status.RUNNING
         try:
-            upstreams_by_name = self._collect_all_upstreams()
-            sig = inspect.signature(self.main)
-            kwargs = {}
-            for param in sig.parameters.values():
-                if param.name == 'self':
-                    kwargs['self'] = self
-                elif param.name in upstreams_by_name:
-                    kwargs[param.name] = upstreams_by_name[param.name]
+            kwargs = self._prepare_main_kwargs()
             result = self.main(**kwargs)
             self.status = Job.Status.SUCCESS
             self.result = result
-            return self.status, result
-        except Exception as e:
+        except Exception:
             self.status = Job.Status.FAILED
             self.result = None
-            return self.status, None

@@ -88,9 +88,6 @@ def test_job_upstream_name_duplicate_parent():
         main.run()
 
 
-# main 函数参数与上游 job name 匹配/不匹配
-
-
 def test_job_main_param_not_match_upstream():
     a = Job('a', lambda: 1)
     b = Job('b', lambda: 2)
@@ -115,13 +112,19 @@ def test_job_diamond_dependency():
     \\ /
      d
     """
-    a = Job('a', lambda: 1)
+    fn_call_count = 0
+    def a_main():
+        nonlocal fn_call_count
+        fn_call_count += 1
+        return fn_call_count
+    a = Job('a', a_main)
     b = Job('b', lambda: 2, upstreams=[a])
     c = Job('c', lambda: 3, upstreams=[a])
     d = Job('d', lambda: 4, upstreams=[b, c])
 
     d.run()
 
+    assert fn_call_count == 1
     assert a.status == Job.Status.SUCCESS
     assert b.status == Job.Status.SUCCESS
     assert d.status == Job.Status.SUCCESS
