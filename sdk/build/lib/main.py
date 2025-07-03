@@ -3,7 +3,7 @@ from .task import ShellTask
 
 def main():
 
-    init_job = Job("my_first_job", lambda: print("init_job"))
+    init_job = Job("my_init_job", lambda: print("init_job"))
 
     job1 = Job(
         "my_first_job",
@@ -12,10 +12,10 @@ def main():
     )
     job2 = Job(
         "my_final_job", 
-        main = lambda my_first_job, my_second_job: print(my_first_job.name, my_first_job._upstreams),
+        main = lambda my_first_job1, my_second_job: print(my_first_job1.name, my_first_job1._upstreams),
         upstreams=[
             job1,
-            init_job
+            Job("my_second_job", lambda: ShellTask("echo 'Hello, World!'").execute())
         ]
     )
 

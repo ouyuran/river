@@ -1,21 +1,13 @@
 from typing import Callable, Any, Optional
+from .task import ShellTask
 import inspect
-from enum import Enum
 
 class Job:
-    class Status(Enum):
-        PENDING = "pending"
-        RUNNING = "running"
-        SUCCESS = "success"
-        FAILED = "failed"
-        SKIPPED = "skipped"
-
     def __init__(self, name: str, main: Callable[..., Any], upstreams: Optional[list['Job']] = None):
         self.name = name
         self.main = main
-        self.result = None
+        self.results = []
         self._upstreams: list[Job] = []
-        self.status = Job.Status.PENDING
         if upstreams:
             self._join(upstreams)
 
@@ -48,14 +40,9 @@ class Job:
         result = {}
         def dfs(job):
             for up in job._upstreams:
-                if up.name in result:
-                    if result[up.name] is not up:
-                        raise ValueError(
-                            f"Duplicate upstream job name detected: '{up.name}' in the upstreams of job '{self.name}'. Job names must be unique in the upstream graph."
-                        )
-                    continue  # same object, skip
-                result[up.name] = up
-                dfs(up)
+                if up.name not in result:
+                    result[up.name] = up
+                    dfs(up)
         dfs(self)
         return result
 
@@ -65,6 +52,7 @@ class Job:
         if id(self) in visited:
             return
         visited.add(id(self))
+        # 递归收集所有上游
         upstreams_by_name = self._collect_all_upstreams()
         sig = inspect.signature(self.main)
         missing = []
@@ -80,33 +68,16 @@ class Job:
             job._validate_all(visited)
 
     def run(self, validate=True):
-        if self.status in (Job.Status.SUCCESS, Job.Status.FAILED, Job.Status.SKIPPED):
-            return self.status, self.result
-        if self.status == Job.Status.RUNNING:
-            raise RuntimeError(f"Job '{self.name}' is already running.")
         if validate:
             self._validate_all()
         for job in self._upstreams:
             job.run(validate=False)
-            if job.status in (Job.Status.FAILED, Job.Status.SKIPPED):
-                self.status = Job.Status.SKIPPED
-                self.result = None
-                return self.status, None
-        self.status = Job.Status.RUNNING
-        try:
-            upstreams_by_name = self._collect_all_upstreams()
-            sig = inspect.signature(self.main)
-            kwargs = {}
-            for param in sig.parameters.values():
-                if param.name == 'self':
-                    kwargs['self'] = self
-                elif param.name in upstreams_by_name:
-                    kwargs[param.name] = upstreams_by_name[param.name]
-            result = self.main(**kwargs)
-            self.status = Job.Status.SUCCESS
-            self.result = result
-            return self.status, result
-        except Exception as e:
-            self.status = Job.Status.FAILED
-            self.result = None
-            return self.status, None
+        upstreams_by_name = self._collect_all_upstreams()
+        sig = inspect.signature(self.main)
+        kwargs = {}
+        for param in sig.parameters.values():
+            if param.name == 'self':
+                kwargs['self'] = self
+            elif param.name in upstreams_by_name:
+                kwargs[param.name] = upstreams_by_name[param.name]
+        return self.main(**kwargs)
