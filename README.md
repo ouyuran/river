@@ -48,7 +48,26 @@ Full observability: Every Task is tracked
 Modular and composable: Jobs can form larger DAGs via Projects
 
 ## 🔮 Roadmap Highlights
-TBD
+- Python SDK
+    - River
+    - Job
+    - Task
+        - ShellTask
+    - Rich console status
+        - Work with log
+    - Secret handling
+    - Open Telemetry
+- Controller
+- Runner
+    - Local runner
+    - Celery runner
+    - K8s runner
+- Sandbox
+    - Container
+        - Docker
+        - Podman
+        - Pod
+    - Virtual machine
 
 ## 📦 Project Status
 River is under active design and development.
