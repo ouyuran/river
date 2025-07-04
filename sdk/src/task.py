@@ -1,25 +1,27 @@
 from typing import Dict, Optional
-from sdk.src.job import job_context
+from sdk.src.job import Job, job_context
 
 
 class Task:
     def __init__(self):
-        self._job_context = job_context.get()
+        self._job: Job = job_context.get()
 
 class ShellTask(Task):
-    def __init__(self, script: str, workdir: Optional[str] = None, shell: str = "/bin/bash", env: Optional[Dict[str, str]] = None):
+    def __init__(self, script: str, cwd: Optional[str] = None, executable: str = "bash", env: Optional[Dict[str, str]] = None):
         super().__init__()
         self._script = script
-        self._workdir = workdir
-        self._shell = shell
+        self._cwd = cwd
+        self._executable = executable
         self._env = env or {}
 
     def execute(self):
-        data = {
+        processed_lines = [line.strip() for line in self._script.split('\n') if line.strip()]
+        processed_script = ';'.join(processed_lines)
+        task = {
             "type": "shell",
-            "script": self._script,
-            "workdir": self._workdir,
-            "shell": self._shell,
+            "script": processed_script,
+            "cwd": self._cwd,
+            "executable": self._executable,
             "env": self._env
         }
-        print(data)
+        return self._job.executor.execute_task(task)

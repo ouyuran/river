@@ -22,14 +22,14 @@ class Job:
         name: str,
         main: Callable[..., Any],
         upstreams: Optional[list['Job']] = None,
-        executor: Optional[BaseExecutor] = DebugExecutor()
+        executor: BaseExecutor = DebugExecutor()
     ):
         self.name = name
         self._main = main
         self.result = None
         self._upstreams: list[Job] = []
         self.status = Job.Status.PENDING
-        self._executor = executor
+        self.executor = executor
         if upstreams:
             self._join(upstreams)
 
@@ -138,6 +138,7 @@ class Job:
             result = self._main(**kwargs)
             self.status = Job.Status.SUCCESS
             self.result = result
-        except Exception:
+        except Exception as e:
+            print(e)
             self.status = Job.Status.FAILED
             self.result = None

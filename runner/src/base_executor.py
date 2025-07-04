@@ -1,3 +1,3 @@
 class BaseExecutor:
-    def execute_task(self, command, **kwargs):
+    def execute_task(self, task):
         raise NotImplementedError("Subclasses must implement this method")
