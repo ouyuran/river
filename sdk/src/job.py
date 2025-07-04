@@ -1,6 +1,13 @@
-from typing import Callable, Any, Optional
 import inspect
+
+from contextvars import ContextVar
 from enum import Enum
+from runner.src.base_executor import BaseExecutor
+from runner.src.debug_executor import DebugExecutor
+from typing import Callable, Any, Optional
+
+
+job_context = ContextVar('river-job')
 
 class Job:
     class Status(Enum):
@@ -10,16 +17,24 @@ class Job:
         FAILED = "failed"
         SKIPPED = "skipped"
 
-    def __init__(self, name: str, main: Callable[..., Any], upstreams: Optional[list['Job']] = None):
+    def __init__(
+        self,
+        name: str,
+        main: Callable[..., Any],
+        upstreams: Optional[list['Job']] = None,
+        executor: Optional[BaseExecutor] = DebugExecutor()
+    ):
         self.name = name
-        self.main = main
+        self._main = main
         self.result = None
         self._upstreams: list[Job] = []
         self.status = Job.Status.PENDING
+        self._executor = executor
         if upstreams:
             self._join(upstreams)
 
     def run(self, validate=True):
+        token = job_context.set(self)
         # TODO: this could be a problem for async jobs
         if self.status == Job.Status.RUNNING:
             raise RuntimeError(f"Job '{self.name}' is already running.")
@@ -29,6 +44,8 @@ class Job:
 
         if not self._run_already_finished() and not self._should_skip_due_to_upstream():
             self._execute_main()
+
+        job_context.reset(token)
         return self.status, self.result
 
     def _join(self, upstreams: list['Job']):
@@ -78,7 +95,7 @@ class Job:
             return
         visited.add(id(self))
         upstreams_by_name = self._collect_all_upstreams()
-        sig = inspect.signature(self.main)
+        sig = inspect.signature(self._main)
         missing = []
         for param in sig.parameters.values():
             if param.name == 'self':
@@ -105,7 +122,7 @@ class Job:
 
     def _prepare_main_kwargs(self):
         upstreams_by_name = self._collect_all_upstreams()
-        sig = inspect.signature(self.main)
+        sig = inspect.signature(self._main)
         kwargs = {}
         for param in sig.parameters.values():
             if param.name == 'self':
@@ -118,7 +135,7 @@ class Job:
         self.status = Job.Status.RUNNING
         try:
             kwargs = self._prepare_main_kwargs()
-            result = self.main(**kwargs)
+            result = self._main(**kwargs)
             self.status = Job.Status.SUCCESS
             self.result = result
         except Exception:
