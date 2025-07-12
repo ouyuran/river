@@ -60,7 +60,7 @@ Modular and composable: Jobs can form larger DAGs via Projects
 - Controller
 - Runner
     - Local runner
-    - Celery runner
+    - Docker runner
     - K8s runner
 - Sandbox
     - Container
@@ -68,6 +68,12 @@ Modular and composable: Jobs can form larger DAGs via Projects
         - Podman
         - Pod
     - Virtual machine
+- Cache
+    - Input
+    - Job is also an input
+        - Analysis job files and 3rd dependencies
+- River join river
+    - cross languages
 
 ## 📦 Project Status
 River is under active design and development.

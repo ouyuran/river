@@ -11,7 +11,7 @@ def main():
         rc, stdout, stderr = ShellTask("""
             echo 'Hello, World!'
         """).execute()
-        print(rc, stdout, stderr)
+        # print(rc, stdout, stderr)
         return rc, stdout, stderr
 
     job1 = Job(

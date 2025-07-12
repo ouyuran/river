@@ -139,6 +139,5 @@ class Job:
             self.status = Job.Status.SUCCESS
             self.result = result
         except Exception as e:
-            print(e)
             self.status = Job.Status.FAILED
             self.result = None

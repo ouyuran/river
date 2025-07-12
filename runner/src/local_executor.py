@@ -13,4 +13,5 @@ class LocalExecutor(BaseExecutor):
             stderr=subprocess.PIPE,
         )
         stdout, stderr = proc.communicate()
-        return proc.returncode, stdout.decode('utf-8'), stderr.decode('utf-8')
+        print(stderr)
+        return proc.returncode, stdout.decode(), stderr.decode()
