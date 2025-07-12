@@ -7,9 +7,16 @@ authors = [
 ]
 requires-python = ">=3.12"
 readme = "README.md"
+dependencies = [
+    "fabric>=3.2.2",
+]
 
 [tool.setuptools.packages.find]
 where = ["sdk", "controller", "runner"]
+
+[[tool.uv.index]]
+url = "https://mirrors.nju.edu.cn/pypi/web/simple"
+default = true
 
 [build-system]
 requires = ["setuptools>=61.0"]

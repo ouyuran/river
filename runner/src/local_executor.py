@@ -1,17 +1,25 @@
-import subprocess
-
+from fabric import Connection
 from runner.src.base_executor import BaseExecutor
 
 class LocalExecutor(BaseExecutor):
+    def __init__(self):
+        pass
+    
     def execute_task(self, task):
-        proc = subprocess.Popen(
-            [task['executable'], '-c', task['script']],
-            cwd=task['cwd'],
-            env=task['env'],
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        stdout, stderr = proc.communicate()
-        print(stderr)
-        return proc.returncode, stdout.decode(), stderr.decode()
+        command = task['command']
+        
+        try:
+            with Connection('localhost') as connection:
+                with connection.cd(task.get('cwd', '.')):
+                    result = connection.local(
+                        command,
+                        env=BaseExecutor.safe_env(task.get('env', {})),
+                        hide=True,
+                        warn=True
+                    )
+                if result:
+                    return result.return_code, result.stdout, result.stderr
+                else:
+                    return 1, "", "Command execution failed: result is None"
+        except Exception as e:
+            raise e

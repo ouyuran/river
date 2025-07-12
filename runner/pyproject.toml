@@ -1,0 +1,22 @@
+[project]
+name = "river-runner"
+version = "0.1.0"
+description = "Runner for river project."
+authors = [
+    { name = "Yuran Ou", email = "hello@ouyuran.com" }
+]
+requires-python = ">=3.12"
+readme = "./README.md"
+dependencies = [
+    "fabric==3.2.2",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta" 
