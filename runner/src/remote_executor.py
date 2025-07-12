@@ -31,14 +31,14 @@ class RemoteExecutor(BaseExecutor):
                     'connect_kwargs': self.connect_kwargs
                 }
             
-            with Connection(**connection_params) as connection:
-                with connection.cd(task.get('cwd', '~')):
-                    result = connection.run(
-                        command,
-                        env=BaseExecutor.safe_env(task.get('env', {})),
-                        hide=True,
-                        warn=True
-                    )
-                return result.return_code, result.stdout, result.stderr
+            with Connection(**connection_params) as connection, \
+                 connection.cd(task.get('cwd', '~')):
+                result = connection.run(
+                    command,
+                    env=BaseExecutor.safe_env(task.get('env', {})),
+                    hide=True,
+                    warn=True
+                )
+            return result.return_code, result.stdout, result.stderr
         except Exception as e:
             return 1, "", str(e)
