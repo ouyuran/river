@@ -1,7 +1,7 @@
 [project]
-name = "river-runner"
+name = "river-sandbox"
 version = "0.1.0"
-description = "Runner for river project."
+description = "Sandbox for river project."
 authors = [
     { name = "Yuran Ou", email = "hello@ouyuran.com" }
 ]
