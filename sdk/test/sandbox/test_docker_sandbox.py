@@ -2,7 +2,7 @@ import pytest
 import unittest.mock
 from unittest.mock import Mock, patch
 from invoke.runners import Result
-from sandbox.src.docker_sandbox import DockerSandbox
+from sdk.src.sandbox.docker_sandbox import DockerSandbox
 
 
 class TestDockerSandbox:
@@ -10,7 +10,7 @@ class TestDockerSandbox:
         self.image = "ubuntu:24.04"
         self.host = "localhost"
 
-    @patch('sandbox.src.docker_sandbox.LocalCommandExecutor')
+    @patch('sdk.src.sandbox.docker_sandbox.LocalCommandExecutor')
     def test_init_localhost(self, mock_local_executor):
         sandbox = DockerSandbox(self.image, self.host)
         
@@ -18,7 +18,7 @@ class TestDockerSandbox:
         assert sandbox._host == self.host
         mock_local_executor.assert_called_once()
 
-    @patch('sandbox.src.docker_sandbox.RemoteCommandExecutor')
+    @patch('sdk.src.sandbox.docker_sandbox.RemoteCommandExecutor')
     def test_init_remote_host(self, mock_remote_executor):
         remote_host = "remote.example.com"
         sandbox = DockerSandbox(self.image, remote_host)

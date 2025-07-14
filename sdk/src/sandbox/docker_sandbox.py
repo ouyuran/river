@@ -1,8 +1,9 @@
-from typing import Optional
 import uuid
-from sandbox.src.command_executor import LocalCommandExecutor, RemoteCommandExecutor
+
+from typing import Optional
+from sdk.src.sandbox.command_executor import LocalCommandExecutor, RemoteCommandExecutor
 from invoke.runners import Result
-from .base_sandbox import BaseSandbox
+from sdk.src.sandbox.base_sandbox import BaseSandbox
 
 
 class DockerSandbox(BaseSandbox):

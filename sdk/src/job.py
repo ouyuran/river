@@ -2,8 +2,6 @@ import inspect
 
 from contextvars import ContextVar
 from enum import Enum
-from runner.src.base_executor import BaseExecutor
-from runner.src.debug_executor import DebugExecutor
 from typing import Callable, Any, Optional
 
 
@@ -22,14 +20,12 @@ class Job:
         name: str,
         main: Callable[..., Any],
         upstreams: Optional[list['Job']] = None,
-        executor: BaseExecutor = DebugExecutor()
     ):
         self.name = name
         self._main = main
         self.result = None
         self._upstreams: list[Job] = []
         self.status = Job.Status.PENDING
-        self.executor = executor
         if upstreams:
             self._join(upstreams)
 

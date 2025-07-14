@@ -1,6 +1,6 @@
 from unittest.mock import Mock, patch
 from invoke.runners import Result
-from sandbox.src.base_sandbox import BaseSandbox, SandboxProxy
+from sdk.src.sandbox.base_sandbox import BaseSandbox, SandboxProxy
 
 
 class ConcreteSandbox(BaseSandbox):
