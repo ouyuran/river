@@ -51,6 +51,10 @@ Modular and composable: Jobs can form larger DAGs via Projects
 - Python SDK
     - River
     - Job
+        - Class inheritant base
+        - Fork
+        - Copy file: can be interface based, decouple jobs
+        - Upstream list -> map
     - Task
         - ShellTask
     - Rich console status
