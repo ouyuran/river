@@ -42,6 +42,11 @@ class BaseSandboxManager(ABC):
             BaseSandbox: A sandbox instance for executing commands
         """
         pass
+
+    @abstractmethod
+    def fork(self, sandBox: BaseSandbox) -> BaseSandbox:
+        """Fork a new sandbox from given one."""
+        pass
     
     @abstractmethod
     def destory(self, sandbox: BaseSandbox) -> None:

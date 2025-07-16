@@ -3,6 +3,7 @@ import inspect
 from contextvars import ContextVar
 from enum import Enum
 from typing import Callable, Any, Optional
+from sdk.src.sandbox.base_sandbox import BaseSandbox
 
 
 job_context = ContextVar('river-job')
@@ -19,6 +20,7 @@ class Job:
         self,
         name: str,
         main: Callable[..., Any],
+        sandbox_creator: Optional[Callable[..., BaseSandbox]] = None,
         upstreams: Optional[dict[str, 'Job']] = None,
     ):
         self.name = name
@@ -39,6 +41,7 @@ class Job:
             self._validate_all()
 
         if not self._run_already_finished() and not self._should_skip_due_to_upstream():
+            
             self._execute_main()
 
         job_context.reset(token)

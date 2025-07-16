@@ -36,6 +36,13 @@ class TestDockerSandbox:
         self.mock_executor.run.assert_called_once_with(expected_cmd)
         assert result is expected_result
 
+    def test_snapshot_property(self):
+        # Test snapshot property getter and setter
+        assert self.sandbox.snapshot is None
+        
+        self.sandbox.snapshot = "test_snapshot_tag"
+        assert self.sandbox.snapshot == "test_snapshot_tag"
+
 
 class TestDockerSandboxManager:
     def setup_method(self):
@@ -134,3 +141,32 @@ class TestDockerSandboxManager:
         
         with pytest.raises(RuntimeError, match="Task snapshot for docker sandbox failed, Docker commit failed"):
             manager.take_snapshot(sandbox)
+
+    def test_fork_success(self):
+        manager = DockerSandboxManager(self.image)
+        mock_executor = Mock()
+        manager._executor = mock_executor
+        
+        # Mock successful docker run for fork
+        mock_result = Mock()
+        mock_result.stdout = "forked_container_456\n"
+        mock_executor.run.return_value = mock_result
+        
+        # Create sandbox with snapshot
+        sandbox = DockerSandbox("container_123", Mock())
+        sandbox.snapshot = "test_snapshot_tag"
+        
+        result = manager.fork(sandbox)
+        
+        mock_executor.run.assert_called_once_with("docker run -d test_snapshot_tag sleep infinity")
+        assert isinstance(result, DockerSandbox)
+        assert result.id == "forked_container_456"
+
+    def test_fork_failure_no_snapshot(self):
+        manager = DockerSandboxManager(self.image)
+        
+        # Create sandbox without snapshot
+        sandbox = DockerSandbox("container_123", Mock())
+        
+        with pytest.raises(RuntimeError, match="There is not snapshot for sandbox."):
+            manager.fork(sandbox)

@@ -12,6 +12,7 @@ class DockerSandbox(BaseSandbox):
         super().__init__(id)
         self._executor: CommandExecutor = executor
         self._connection: Optional[Connection] = None
+        self._snapshot: Optional[str] = None
 
     def execute(
         self,
@@ -32,13 +33,21 @@ class DockerSandbox(BaseSandbox):
         
         return self._executor.run(docker_cmd)
     
+    @property
+    def snapshot(self) -> Optional[str]:
+        return self._snapshot
+    
+    @snapshot.setter
+    def snapshot(self, tag: str):
+        self._snapshot = tag
+    
 
 class DockerSandboxManager(BaseSandboxManager):
     def __init__(self, image: str, host: str = "localhost"):
         super().__init__()
-        self.image = image
-        self._host = host
-        self._executor = self._create_executor(host)
+        self.image: str = image
+        self._host: str = host
+        self._executor: CommandExecutor = self._create_executor(host)
     
     def _create_executor(self,host: str) -> CommandExecutor:
         return LocalCommandExecutor() if host == "localhost" else RemoteCommandExecutor(host)
@@ -59,6 +68,11 @@ class DockerSandboxManager(BaseSandboxManager):
             # Create new executor instance to isolate manager and sandbox
             executor=self._create_executor(self._host)
         )
+    
+    def fork(self, sandbox: DockerSandbox) -> DockerSandbox:
+        if sandbox.snapshot is None:
+            raise RuntimeError("There is not snapshot for sandbox.")
+        return self.create(sandbox.snapshot)
 
     def destory(self, sandbox: DockerSandbox) -> None:
         """Stop and remove the Docker container."""
@@ -72,4 +86,5 @@ class DockerSandboxManager(BaseSandboxManager):
         if not result.ok:
             msg = f"Task snapshot for docker sandbox failed, {result.stderr}"
             raise RuntimeError(msg)
+        sandbox.snapshot = tag
         return tag

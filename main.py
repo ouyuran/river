@@ -1,6 +1,5 @@
 from sdk.src.job import Job
 from sdk.src.task import ShellTask
-from runner.src.local_executor import LocalExecutor
 
 def main():
 
@@ -17,16 +16,16 @@ def main():
     job1 = Job(
         "my_first_job",
         job1_main,
-        upstreams=[init_job],
-        executor=LocalExecutor()
+        upstreams={
+            "init": init_job
+        },
     )
     job2 = Job(
         "my_final_job", 
         main = lambda my_first_job: print(my_first_job.name, my_first_job._upstreams),
-        upstreams=[
-            job1,
-            init_job
-        ]
+        upstreams={
+            "first_job": job1,
+        }
     )
 
     job2.run()

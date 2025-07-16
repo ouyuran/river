@@ -1,5 +1,5 @@
 from invoke.runners import Result
-from sdk.src.sandbox.base_sandbox import BaseSandbox
+from sdk.src.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
 
 
 class ConcreteSandbox(BaseSandbox):
@@ -25,3 +25,13 @@ class TestBaseSandbox:
         
         assert result.stdout == "test_output"
         assert result.command == "ls"
+
+
+class TestBaseSandboxManager:
+
+    def test_has_abstract_methods(self):
+        # Test that BaseSandboxManager has required abstract methods
+        assert hasattr(BaseSandboxManager, 'create')
+        assert hasattr(BaseSandboxManager, 'fork')
+        assert hasattr(BaseSandboxManager, 'destory')
+        assert hasattr(BaseSandboxManager, 'take_snapshot')
