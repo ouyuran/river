@@ -28,6 +28,9 @@ class Job:
         self.result = None
         self._upstreams: dict[str, Job] = {}
         self.status = Job.Status.PENDING
+        self.sandbox: Optional[BaseSandbox] = None
+        self._sandbox_creator = sandbox_creator
+        self.error: Optional[Exception] = None
         if upstreams:
             self._join(upstreams)
 
@@ -41,8 +44,14 @@ class Job:
             self._validate_all()
 
         if not self._run_already_finished() and not self._should_skip_due_to_upstream():
-            
-            self._execute_main()
+            try:
+                if self._sandbox_creator:
+                    self.sandbox = self._sandbox_creator()
+                self._execute_main()
+            except Exception as e:
+                self.status = Job.Status.FAILED
+                self.result = None
+                self.error = e
 
         job_context.reset(token)
         return self.status, self.result
@@ -116,11 +125,7 @@ class Job:
 
     def _execute_main(self):
         self.status = Job.Status.RUNNING
-        try:
-            kwargs = self._prepare_main_kwargs()
-            result = self._main(**kwargs)
-            self.status = Job.Status.SUCCESS
-            self.result = result
-        except Exception as e:
-            self.status = Job.Status.FAILED
-            self.result = None
+        kwargs = self._prepare_main_kwargs()
+        result = self._main(**kwargs)
+        self.status = Job.Status.SUCCESS
+        self.result = result

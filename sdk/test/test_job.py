@@ -1,6 +1,7 @@
 import pytest
 from sdk.src.job import Job
 from unittest.mock import Mock
+from sdk.src.sandbox.base_sandbox import BaseSandbox
 
 
 class TestJob:
@@ -10,6 +11,7 @@ class TestJob:
         assert a.name == 'a'
         assert a.status == Job.Status.PENDING
         assert a.result is None
+        assert a.error is None
 
 
     def test_job_run(self):
@@ -33,6 +35,8 @@ class TestJob:
         assert a.result is None
         assert result is None
         assert status == Job.Status.FAILED
+        assert a.error is not None
+        assert str(a.error) == "Failed"
 
     def test_job_run_already_running(self):
         a = Job('a', lambda: 'A')
@@ -114,3 +118,76 @@ class TestJob:
         assert b.status == Job.Status.SUCCESS
         assert d.status == Job.Status.SUCCESS
         assert c.status == Job.Status.SUCCESS
+
+
+class TestJobSandbox:
+
+    def test_job_init_with_sandbox_creator(self):
+        # Test Job initialization with sandbox_creator
+        mock_sandbox_creator = Mock()
+        job = Job('test_job', lambda: 'result', sandbox_creator=mock_sandbox_creator)
+        
+        assert job._sandbox_creator is mock_sandbox_creator
+        assert job.sandbox is None
+
+    def test_job_init_without_sandbox_creator(self):
+        # Test Job initialization without sandbox_creator
+        job = Job('test_job', lambda: 'result')
+        
+        assert job._sandbox_creator is None
+        assert job.sandbox is None
+
+    def test_job_run_creates_sandbox(self):
+        # Test that running a job creates sandbox when sandbox_creator is provided
+        mock_sandbox = Mock(spec=BaseSandbox)
+        mock_sandbox_creator = Mock(return_value=mock_sandbox)
+        
+        job = Job('test_job', lambda: 'result', sandbox_creator=mock_sandbox_creator)
+        
+        status, result = job.run()
+        
+        mock_sandbox_creator.assert_called_once()
+        assert job.sandbox is mock_sandbox
+        assert status == Job.Status.SUCCESS
+        assert result == 'result'
+
+    def test_job_run_without_sandbox_creator(self):
+        # Test that running a job without sandbox_creator doesn't create sandbox
+        job = Job('test_job', lambda: 'result')
+        
+        status, result = job.run()
+        
+        assert job.sandbox is None
+        assert status == Job.Status.SUCCESS
+        assert result == 'result'
+
+    def test_job_sandbox_available_in_main(self):
+        # Test that sandbox is available in main function through self parameter
+        mock_sandbox = Mock(spec=BaseSandbox)
+        mock_sandbox_creator = Mock(return_value=mock_sandbox)
+        
+        def main(self):
+            assert self.sandbox is mock_sandbox
+            return 'success'
+        
+        job = Job('test_job', main, sandbox_creator=mock_sandbox_creator)
+        
+        status, result = job.run()
+        
+        assert status == Job.Status.SUCCESS
+        assert result == 'success'
+        assert job.sandbox is mock_sandbox
+
+    def test_job_sandbox_creator_exception_fails_job(self):
+        # Test that exception in sandbox_creator causes job to fail
+        mock_sandbox_creator = Mock(side_effect=Exception("Sandbox creation failed"))
+        
+        job = Job('test_job', lambda: 'result', sandbox_creator=mock_sandbox_creator)
+        
+        status, result = job.run()
+        
+        assert status == Job.Status.FAILED
+        assert result is None
+        assert job.sandbox is None
+        assert job.error is not None
+        assert str(job.error) == "Sandbox creation failed"
