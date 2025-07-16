@@ -7,6 +7,11 @@ from fabric import Connection
 class CommandExecutor(ABC):
     """Abstract command executor interface"""
 
+    # @abstractmethod
+    # def connect(self) -> Connection:
+    #     """Establish connection to command execution environment."""
+    #     pass
+
     @abstractmethod
     def run(
         self, command: str, cwd: str = ".", env: Optional[dict[str, str]] = None
