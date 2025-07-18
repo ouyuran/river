@@ -59,6 +59,7 @@ class Job:
                 self.status = Job.Status.FAILED
                 self.result = None
                 self.error = e
+                raise(e)
 
         job_context.reset(token)
         print(self.name, self.status, self.result, self.error)

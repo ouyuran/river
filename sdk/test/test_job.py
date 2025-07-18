@@ -156,7 +156,8 @@ class TestJobSandbox:
         assert result == 'result'
         mock_take_snapshot.assert_called_once_with(mock_sandbox)
 
-    def test_job_run_without_sandbox_creator(self):
+    @patch('sdk.src.job.docker_sandbox_manager.take_snapshot')
+    def test_job_run_without_sandbox_creator(self, mock_take_snapshot):
         # Test that running a job without sandbox_creator doesn't create sandbox
         job = Job('test_job', lambda: 'result')
         
@@ -165,6 +166,8 @@ class TestJobSandbox:
         assert job.sandbox is None
         assert status == Job.Status.SUCCESS
         assert result == 'result'
+        mock_take_snapshot.assert_not_called()
+
 
     @patch('sdk.src.job.docker_sandbox_manager.take_snapshot')
     def test_job_sandbox_available_in_main(self, mock_take_snapshot):

@@ -24,11 +24,11 @@ class LocalCommandExecutor(CommandExecutor):
     """Local command executor"""
 
     def run(
-        self, command: str, cwd: str = ".", env: Optional[dict[str, str]] = None
+        self, command: str, cwd: str = ".d", env: Optional[dict[str, str]] = None
     ) -> Result:
         with Connection("localhost") as connection, connection.cd(cwd):
             result = connection.local(command, env=env or {}, hide=True, warn=True)
-        return result if result else Result(exited=1, stderr="Local run returns None")
+        return result if result else Result(exited=1, stderr=f"Local run returns None, command: {command}")
 
 
 class RemoteCommandExecutor(CommandExecutor):

@@ -2,10 +2,13 @@ import uuid
 
 from fabric import Connection
 from functools import partial
-from typing import Callable, Optional
+from typing import Callable, Optional, TYPE_CHECKING
 from sdk.src.sandbox.command_executor import CommandExecutor, LocalCommandExecutor, RemoteCommandExecutor
 from invoke.runners import Result
 from sdk.src.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
+
+if TYPE_CHECKING:
+    from sdk.src.job import Job
 
 
 class DockerSandbox(BaseSandbox):
@@ -18,7 +21,7 @@ class DockerSandbox(BaseSandbox):
     def execute(
         self,
         command: str,
-        cwd: str,
+        cwd: Optional[str] = None,
         env: Optional[dict[str, str]] = None
     ) -> Result:
         """Generate docker exec command"""
@@ -29,8 +32,10 @@ class DockerSandbox(BaseSandbox):
             for key, value in env.items():
                 docker_cmd += f" -e {key}={value}"
         
-        docker_cmd += f" -w {cwd}"
-        docker_cmd += f" {self.id} {command}"
+        # TODO, add test for cwd == None
+        docker_cmd += f" -w {cwd if cwd is not None else '/'}"
+        # TODO, docker_cmd += f" {self.id} bash -c {shlex.quote(command)}"
+        docker_cmd += f" {self.id} bash -c \"{command}\""
         
         return self._executor.run(docker_cmd)
     
@@ -71,13 +76,18 @@ class DockerSandboxManager(BaseSandboxManager):
             executor=self._create_executor(self._host)
         )
     
-    def fork(self, sandbox: DockerSandbox) -> DockerSandbox:
+    def fork(self, job: 'Job') -> DockerSandbox:
+        sandbox = job.sandbox
+        if sandbox is None:
+            msg = f"There is not sandbox for job {job.name}"
+            raise(RuntimeError(msg))
+        snapshot = sandbox.snapshot
         if sandbox.snapshot is None:
-            print(444)
             msg = f"There is not snapshot for sandbox {sandbox.id}."
             raise RuntimeError(msg)
-        return self.create(sandbox.snapshot)
+        return self.create(snapshot)
 
+    # TODO, call this, doesn't work?
     def destory(self, sandbox: DockerSandbox) -> None:
         """Stop and remove the Docker container."""
         self._executor.run(f"docker stop {sandbox.id}")

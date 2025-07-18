@@ -26,7 +26,7 @@ def main():
     job2 = Job(
         "cat_hello_file",
         main=cat_hello_file,
-        sandbox_creator=docker_sandbox_manager.forker(job1.sandbox),
+        sandbox_creator=docker_sandbox_manager.forker(job1),
         upstreams={
             "create_job": job1
         }

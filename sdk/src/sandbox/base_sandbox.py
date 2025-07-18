@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, TypeVar
+from typing import Callable, Optional, TypeVar, TYPE_CHECKING
 from functools import partial
-from enum import Enum
 from invoke.runners import Result
+
+if TYPE_CHECKING:
+    from sdk.src.job import Job
 
 T = TypeVar('T', bound='BaseSandbox')
 
@@ -45,7 +47,7 @@ class BaseSandboxManager(ABC):
         """
         pass
 
-    def forker(self, sandbox: T) -> Callable[[], T]:
+    def forker(self, job: 'Job') -> Callable[[], BaseSandbox]:
         """Create a no-argument callable that forks the given sandbox.
         
         Args:
@@ -54,10 +56,10 @@ class BaseSandboxManager(ABC):
         Returns:
             A callable that when invoked will fork the sandbox
         """
-        return partial(self.fork, sandbox)
+        return partial(self.fork, job)
 
     @abstractmethod
-    def fork(self, sandBox: T) -> T:
+    def fork(self, job: 'Job') -> BaseSandbox:
         """Fork a new sandbox from given one."""
         pass
     
