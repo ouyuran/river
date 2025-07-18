@@ -4,9 +4,11 @@ from contextvars import ContextVar
 from enum import Enum
 from typing import Callable, Any, Optional
 from sdk.src.sandbox.base_sandbox import BaseSandbox
+from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
 
 
 job_context = ContextVar('river-job')
+docker_sandbox_manager = DockerSandboxManager("ubuntu")
 
 class Job:
     class Status(Enum):
@@ -20,7 +22,7 @@ class Job:
         self,
         name: str,
         main: Callable[..., Any],
-        sandbox_creator: Optional[Callable[..., BaseSandbox]] = None,
+        sandbox_creator: Optional[Callable[[], BaseSandbox]] = None,
         upstreams: Optional[dict[str, 'Job']] = None,
     ):
         self.name = name
@@ -28,7 +30,7 @@ class Job:
         self.result = None
         self._upstreams: dict[str, Job] = {}
         self.status = Job.Status.PENDING
-        self.sandbox: Optional[BaseSandbox] = None
+        self.sandbox: Any = None  # Use Any to avoid forcing users to specify generic types
         self._sandbox_creator = sandbox_creator
         self.error: Optional[Exception] = None
         if upstreams:
@@ -48,13 +50,19 @@ class Job:
                 if self._sandbox_creator:
                     self.sandbox = self._sandbox_creator()
                 self._execute_main()
+                if self.sandbox:
+                    docker_sandbox_manager.take_snapshot(self.sandbox)
+                # TODO, take snapshot here, maybe we should set SandboxManager to current river context?
+                # Rivers holds manager and Job uses it
+                # Job holds sandbox and Taks uses it
             except Exception as e:
                 self.status = Job.Status.FAILED
                 self.result = None
                 self.error = e
 
         job_context.reset(token)
-        return self.status, self.result
+        print(self.name, self.status, self.result, self.error)
+        return self.status, self.result, self.error
 
     def _join(self, upstreams: dict[str, 'Job']):
         for key, job in upstreams.items():

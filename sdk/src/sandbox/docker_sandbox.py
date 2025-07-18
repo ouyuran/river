@@ -1,7 +1,8 @@
 import uuid
 
 from fabric import Connection
-from typing import Optional
+from functools import partial
+from typing import Callable, Optional
 from sdk.src.sandbox.command_executor import CommandExecutor, LocalCommandExecutor, RemoteCommandExecutor
 from invoke.runners import Result
 from sdk.src.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
@@ -45,6 +46,7 @@ class DockerSandbox(BaseSandbox):
 class DockerSandboxManager(BaseSandboxManager):
     def __init__(self, image: str, host: str = "localhost"):
         super().__init__()
+        # TODO, remove this one
         self.image: str = image
         self._host: str = host
         self._executor: CommandExecutor = self._create_executor(host)
@@ -71,7 +73,9 @@ class DockerSandboxManager(BaseSandboxManager):
     
     def fork(self, sandbox: DockerSandbox) -> DockerSandbox:
         if sandbox.snapshot is None:
-            raise RuntimeError("There is not snapshot for sandbox.")
+            print(444)
+            msg = f"There is not snapshot for sandbox {sandbox.id}."
+            raise RuntimeError(msg)
         return self.create(sandbox.snapshot)
 
     def destory(self, sandbox: DockerSandbox) -> None:

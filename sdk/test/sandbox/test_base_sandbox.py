@@ -1,5 +1,6 @@
 from invoke.runners import Result
 from sdk.src.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
+from unittest.mock import Mock
 
 
 class ConcreteSandbox(BaseSandbox):
@@ -9,6 +10,21 @@ class ConcreteSandbox(BaseSandbox):
     
     def execute(self, command: str, cwd: str, env=None) -> Result:
         return Result(stdout="test_output", stderr="", command=command, shell="", env={}, exited=0)
+
+
+class ConcreteSandboxManager(BaseSandboxManager):
+    """Concrete implementation for testing BaseSandboxManager"""
+    def create(self) -> BaseSandbox:
+        return ConcreteSandbox("created_sandbox")
+    
+    def fork(self, sandbox: BaseSandbox) -> BaseSandbox:
+        return ConcreteSandbox(f"forked_{sandbox.id}")
+    
+    def destory(self, sandbox: BaseSandbox) -> None:
+        pass
+    
+    def take_snapshot(self, sandbox: BaseSandbox) -> str:
+        return f"snapshot_{sandbox.id}"
 
 
 class TestBaseSandbox:
@@ -35,3 +51,45 @@ class TestBaseSandboxManager:
         assert hasattr(BaseSandboxManager, 'fork')
         assert hasattr(BaseSandboxManager, 'destory')
         assert hasattr(BaseSandboxManager, 'take_snapshot')
+    
+    def test_forker_returns_callable(self):
+        # Test that forker returns a callable
+        manager = ConcreteSandboxManager()
+        sandbox = ConcreteSandbox("test_sandbox")
+        
+        forker_fn = manager.forker(sandbox)
+        
+        assert callable(forker_fn)
+    
+    def test_forker_callable_forks_sandbox(self):
+        # Test that the callable returned by forker actually forks the sandbox
+        manager = ConcreteSandboxManager()
+        original_sandbox = ConcreteSandbox("original_sandbox")
+        
+        forker_fn = manager.forker(original_sandbox)
+        forked_sandbox = forker_fn()
+        
+        assert forked_sandbox.id == "forked_original_sandbox"
+        assert forked_sandbox.id != original_sandbox.id
+    
+    def test_forker_callable_no_arguments(self):
+        # Test that the callable returned by forker takes no arguments
+        manager = ConcreteSandboxManager()
+        sandbox = ConcreteSandbox("test_sandbox")
+        
+        forker_fn = manager.forker(sandbox)
+        
+        # Should be able to call with no arguments
+        result = forker_fn()
+        assert isinstance(result, BaseSandbox)
+    
+    def test_forker_preserves_sandbox_type(self):
+        # Test that forker preserves the type of the sandbox
+        manager = ConcreteSandboxManager()
+        sandbox = ConcreteSandbox("typed_sandbox")
+        
+        forker_fn = manager.forker(sandbox)
+        forked_sandbox = forker_fn()
+        
+        assert type(forked_sandbox) == type(sandbox)
+        assert isinstance(forked_sandbox, ConcreteSandbox)

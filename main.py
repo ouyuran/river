@@ -1,30 +1,34 @@
+from functools import partial
 from sdk.src.job import Job
 from sdk.src.task import ShellTask
+from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
+
+
+docker_sandbox_manager = DockerSandboxManager("ubuntu")
+create_ubuntu_sandbox = partial(docker_sandbox_manager.create, image="ubuntu")
 
 def main():
 
-    init_job = Job("my_init_job", lambda: print("init_job"))
-
-    def job1_main():
-        print("job1_main")
-        rc, stdout, stderr = ShellTask("""
-            echo 'Hello, World!'
-        """).execute()
-        # print(rc, stdout, stderr)
-        return rc, stdout, stderr
+    def create_hello_file():
+        result = ShellTask("echo 'Hello, river!' > hello_river.txt").execute()
+        print(result)
 
     job1 = Job(
-        "my_first_job",
-        job1_main,
-        upstreams={
-            "init": init_job
-        },
+        "create_hello_file",
+        main=create_hello_file,
+        sandbox_creator=create_ubuntu_sandbox
     )
+
+    def cat_hello_file():
+        result = ShellTask("cat hello_river.txt").execute()
+        print(result)
+
     job2 = Job(
-        "my_final_job", 
-        main = lambda my_first_job: print(my_first_job.name, my_first_job._upstreams),
+        "cat_hello_file",
+        main=cat_hello_file,
+        sandbox_creator=docker_sandbox_manager.forker(job1.sandbox),
         upstreams={
-            "first_job": job1,
+            "create_job": job1
         }
     )
 

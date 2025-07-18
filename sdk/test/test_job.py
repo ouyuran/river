@@ -1,6 +1,6 @@
 import pytest
 from sdk.src.job import Job
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from sdk.src.sandbox.base_sandbox import BaseSandbox
 
 
@@ -16,12 +16,14 @@ class TestJob:
 
     def test_job_run(self):
         a = Job('a', lambda: 'A')
-        status, result = a.run()
+        status, result, error = a.run() 
+
         assert a.name == 'a'
         assert a.status == Job.Status.SUCCESS
         assert a.result == 'A'
         assert result == 'A'
         assert status == Job.Status.SUCCESS
+        assert error == None
 
 
     def test_job_run_failed(self):
@@ -29,7 +31,7 @@ class TestJob:
             raise Exception("Failed")
         a = Job('a', main)
 
-        status, result = a.run()
+        status, result, error = a.run()
 
         assert a.status == Job.Status.FAILED
         assert a.result is None
@@ -37,12 +39,13 @@ class TestJob:
         assert status == Job.Status.FAILED
         assert a.error is not None
         assert str(a.error) == "Failed"
+        assert str(error) == "Failed"
 
     def test_job_run_already_running(self):
         a = Job('a', lambda: 'A')
         a.run()
         # run again should not raise, should return (status, result)
-        status, result = a.run()
+        status, result, _ = a.run()
         assert result == 'A'
         assert status == Job.Status.SUCCESS
         assert a.status == Job.Status.SUCCESS
@@ -69,7 +72,7 @@ class TestJob:
         a = Job('a', a_main)
         b = Job('b', lambda a: a, upstreams={'a': a})
 
-        status, result = b.run()
+        status, result, _ = b.run()
 
         assert a.status == Job.Status.FAILED
         assert b.status == Job.Status.SKIPPED
@@ -137,31 +140,34 @@ class TestJobSandbox:
         assert job._sandbox_creator is None
         assert job.sandbox is None
 
-    def test_job_run_creates_sandbox(self):
+    @patch('sdk.src.job.docker_sandbox_manager.take_snapshot')
+    def test_job_run_creates_sandbox(self, mock_take_snapshot):
         # Test that running a job creates sandbox when sandbox_creator is provided
         mock_sandbox = Mock(spec=BaseSandbox)
         mock_sandbox_creator = Mock(return_value=mock_sandbox)
         
         job = Job('test_job', lambda: 'result', sandbox_creator=mock_sandbox_creator)
         
-        status, result = job.run()
+        status, result, _ = job.run()
         
         mock_sandbox_creator.assert_called_once()
         assert job.sandbox is mock_sandbox
         assert status == Job.Status.SUCCESS
         assert result == 'result'
+        mock_take_snapshot.assert_called_once_with(mock_sandbox)
 
     def test_job_run_without_sandbox_creator(self):
         # Test that running a job without sandbox_creator doesn't create sandbox
         job = Job('test_job', lambda: 'result')
         
-        status, result = job.run()
+        status, result, _ = job.run()
         
         assert job.sandbox is None
         assert status == Job.Status.SUCCESS
         assert result == 'result'
 
-    def test_job_sandbox_available_in_main(self):
+    @patch('sdk.src.job.docker_sandbox_manager.take_snapshot')
+    def test_job_sandbox_available_in_main(self, mock_take_snapshot):
         # Test that sandbox is available in main function through self parameter
         mock_sandbox = Mock(spec=BaseSandbox)
         mock_sandbox_creator = Mock(return_value=mock_sandbox)
@@ -172,7 +178,7 @@ class TestJobSandbox:
         
         job = Job('test_job', main, sandbox_creator=mock_sandbox_creator)
         
-        status, result = job.run()
+        status, result, _ = job.run()
         
         assert status == Job.Status.SUCCESS
         assert result == 'success'
@@ -184,7 +190,7 @@ class TestJobSandbox:
         
         job = Job('test_job', lambda: 'result', sandbox_creator=mock_sandbox_creator)
         
-        status, result = job.run()
+        status, result, _ = job.run()
         
         assert status == Job.Status.FAILED
         assert result is None
