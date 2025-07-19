@@ -4,11 +4,9 @@ from contextvars import ContextVar
 from enum import Enum
 from typing import Callable, Any, Optional
 from sdk.src.sandbox.base_sandbox import BaseSandbox
-from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
 
 
 job_context = ContextVar('river-job')
-docker_sandbox_manager = DockerSandboxManager("ubuntu")
 
 class Job:
     class Status(Enum):
@@ -51,10 +49,7 @@ class Job:
                     self.sandbox = self._sandbox_creator()
                 self._execute_main()
                 if self.sandbox:
-                    docker_sandbox_manager.take_snapshot(self.sandbox)
-                # TODO, take snapshot here, maybe we should set SandboxManager to current river context?
-                # Rivers holds manager and Job uses it
-                # Job holds sandbox and Taks uses it
+                    self._get_sandbox_manager().take_snapshot(self.sandbox)
             except Exception as e:
                 self.status = Job.Status.FAILED
                 self.result = None
@@ -63,7 +58,7 @@ class Job:
             finally:
                 # TODO, add test
                 if self.sandbox:
-                    docker_sandbox_manager.destory(self.sandbox)
+                    self._get_sandbox_manager().destory(self.sandbox)
 
         job_context.reset(token)
         print(self.name, self.status, self.result, self.error)
@@ -142,3 +137,13 @@ class Job:
         result = self._main(**kwargs)
         self.status = Job.Status.SUCCESS
         self.result = result
+
+    def _get_sandbox_manager(self):
+        """Get the SandboxManager from River context."""
+        from sdk.src.river import River
+        sandbox_manager = River.get_current_sandbox_manager()
+        if sandbox_manager is None:
+            # Fallback to default DockerSandboxManager for backward compatibility
+            from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
+            return DockerSandboxManager("ubuntu")
+        return sandbox_manager
