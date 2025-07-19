@@ -1,4 +1,5 @@
 import uuid
+import shlex
 
 from fabric import Connection
 from functools import partial
@@ -34,8 +35,7 @@ class DockerSandbox(BaseSandbox):
         
         # TODO, add test for cwd == None
         docker_cmd += f" -w {cwd if cwd is not None else '/'}"
-        # TODO, docker_cmd += f" {self.id} bash -c {shlex.quote(command)}"
-        docker_cmd += f" {self.id} bash -c \"{command}\""
+        docker_cmd += f" {self.id} bash -c {shlex.quote(command)}"
         
         return self._executor.run(docker_cmd)
     
