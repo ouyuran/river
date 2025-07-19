@@ -37,6 +37,10 @@ class BaseSandbox(ABC):
     #     pass
 
 class BaseSandboxManager(ABC):
+
+    @abstractmethod
+    def creator(self) -> Callable[[], BaseSandbox]:
+        pass
     
     @abstractmethod
     def create(self) -> BaseSandbox:
@@ -48,7 +52,7 @@ class BaseSandboxManager(ABC):
         pass
 
     def forker(self, job: 'Job') -> Callable[[], BaseSandbox]:
-        """Create a no-argument callable that forks the given sandbox.
+        """Create a no-argument callable that forks the sandbox from given job.
         
         Args:
             sandbox: The sandbox to fork from

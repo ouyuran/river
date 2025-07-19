@@ -5,7 +5,6 @@ from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
 
 
 docker_sandbox_manager = DockerSandboxManager("ubuntu")
-create_ubuntu_sandbox = partial(docker_sandbox_manager.create, image="ubuntu")
 
 def main():
 
@@ -16,7 +15,7 @@ def main():
     job1 = Job(
         "create_hello_file",
         main=create_hello_file,
-        sandbox_creator=create_ubuntu_sandbox
+        sandbox_creator=docker_sandbox_manager.creator(image="ubuntu")
     )
 
     def cat_hello_file():

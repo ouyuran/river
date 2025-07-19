@@ -59,6 +59,10 @@ class DockerSandboxManager(BaseSandboxManager):
     def _create_executor(self,host: str) -> CommandExecutor:
         return LocalCommandExecutor() if host == "localhost" else RemoteCommandExecutor(host)
     
+    # TODO, test
+    def creator(self, image: str) -> Callable[[], BaseSandbox]:
+        return partial(self.create, image)
+
     def create(self, image: str) -> DockerSandbox:
         """Start a Docker container.
         
@@ -68,7 +72,7 @@ class DockerSandboxManager(BaseSandboxManager):
         Returns:
             DockerSandBox: The representation of the started container.
         """
-        result = self._executor.run(f"docker run -d {image} sleep infinity")
+        result = self._executor.run(f"docker run -d {image} tail -f /dev/null")
         container_id = result.stdout.strip()
         return DockerSandbox(
             id=container_id,
@@ -87,10 +91,9 @@ class DockerSandboxManager(BaseSandboxManager):
             raise RuntimeError(msg)
         return self.create(snapshot)
 
-    # TODO, call this, doesn't work?
     def destory(self, sandbox: DockerSandbox) -> None:
         """Stop and remove the Docker container."""
-        self._executor.run(f"docker stop {sandbox.id}")
+        self._executor.run(f"docker stop -t 0 {sandbox.id}")
         self._executor.run(f"docker rm {sandbox.id}")
 
     def take_snapshot(self, sandbox: DockerSandbox) -> str:

@@ -60,6 +60,10 @@ class Job:
                 self.result = None
                 self.error = e
                 raise(e)
+            finally:
+                # TODO, add test
+                if self.sandbox:
+                    docker_sandbox_manager.destory(self.sandbox)
 
         job_context.reset(token)
         print(self.name, self.status, self.result, self.error)
