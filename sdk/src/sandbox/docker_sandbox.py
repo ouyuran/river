@@ -28,14 +28,22 @@ class DockerSandbox(BaseSandbox):
         """Generate docker exec command"""
         docker_cmd = f"docker exec"
         
-        # Add environment variables
+        # Add environment variables (with safe escaping)
         if env:
             for key, value in env.items():
-                docker_cmd += f" -e {key}={value}"
+                env_pair = f"{key}={value}"
+                safe_env_pair = shlex.quote(env_pair)
+                docker_cmd += f" -e {safe_env_pair}"
         
-        # TODO, add test for cwd == None
-        docker_cmd += f" -w {cwd if cwd is not None else '/'}"
-        docker_cmd += f" {self.id} bash -c {shlex.quote(command)}"
+        # Add working directory (with safe escaping)
+        safe_cwd = shlex.quote(cwd if cwd is not None else '/')
+        docker_cmd += f" -w {safe_cwd}"
+        
+        # Add container ID and command (with safe escaping)
+        safe_container_id = shlex.quote(self.id)
+        safe_command = shlex.quote(command)
+        docker_cmd += f" {safe_container_id} bash -c {safe_command}"
+        print(docker_cmd)
         
         return self._executor.run(docker_cmd)
     

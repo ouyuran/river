@@ -21,7 +21,7 @@ class TestDockerSandbox:
 
         result = self.sandbox.execute("ls", "/tmp")
 
-        expected_cmd = "docker exec -w /tmp container_123 ls"
+        expected_cmd = "docker exec -w /tmp container_123 bash -c ls"
         self.mock_executor.run.assert_called_once_with(expected_cmd)
         assert result is expected_result
 
@@ -32,7 +32,20 @@ class TestDockerSandbox:
         env = {"VAR1": "value1", "VAR2": "value2"}
         result = self.sandbox.execute("echo $VAR1", "/home", env)
 
-        expected_cmd = "docker exec -e VAR1=value1 -e VAR2=value2 -w /home container_123 echo $VAR1"
+        expected_cmd = "docker exec -e VAR1=value1 -e VAR2=value2 -w /home container_123 bash -c 'echo $VAR1'"
+        self.mock_executor.run.assert_called_once_with(expected_cmd)
+        assert result is expected_result
+
+    def test_execute_should_quote_inputs(self):
+        """Test that inputs with special characters are properly quoted"""
+        expected_result = Result(stdout="output", stderr="", command="", shell="", env={}, exited=0)
+        self.mock_executor.run.return_value = expected_result
+
+        # Test with special characters in paths and environment variables that need quoting
+        result = self.sandbox.execute("echo hello", "/tmp with spaces", {"KEY": "value with spaces"})
+
+        # shlex.quote() will quote strings with special characters
+        expected_cmd = "docker exec -e 'KEY=value with spaces' -w '/tmp with spaces' container_123 bash -c 'echo hello'"
         self.mock_executor.run.assert_called_once_with(expected_cmd)
         assert result is expected_result
 
@@ -78,7 +91,7 @@ class TestDockerSandboxManager:
 
         result = manager.create(self.image)
 
-        mock_executor.run.assert_called_once_with(f"docker run -d {self.image} sleep infinity")
+        mock_executor.run.assert_called_once_with(f"docker run -d {self.image} tail -f /dev/null")
         assert isinstance(result, DockerSandbox)
         assert result.id == "container_id_123"
 
@@ -91,7 +104,7 @@ class TestDockerSandboxManager:
         manager.destory(sandbox)
 
         expected_calls = [
-            unittest.mock.call("docker stop container_123"),
+            unittest.mock.call("docker stop -t 0 container_123"),
             unittest.mock.call("docker rm container_123")
         ]
         mock_executor.run.assert_has_calls(expected_calls)
@@ -156,9 +169,13 @@ class TestDockerSandboxManager:
         sandbox = DockerSandbox("container_123", Mock())
         sandbox.snapshot = "test_snapshot_tag"
         
-        result = manager.fork(sandbox)
+        # Create mock job with sandbox
+        mock_job = Mock()
+        mock_job.sandbox = sandbox
         
-        mock_executor.run.assert_called_once_with("docker run -d test_snapshot_tag sleep infinity")
+        result = manager.fork(mock_job)
+        
+        mock_executor.run.assert_called_once_with("docker run -d test_snapshot_tag tail -f /dev/null")
         assert isinstance(result, DockerSandbox)
         assert result.id == "forked_container_456"
 
@@ -167,6 +184,10 @@ class TestDockerSandboxManager:
 
         # Create sandbox without snapshot
         sandbox = DockerSandbox("container_123", Mock())
+        
+        # Create mock job with sandbox
+        mock_job = Mock()
+        mock_job.sandbox = sandbox
 
-        with pytest.raises(RuntimeError, match="There is not snapshot for sandbox."):
-            manager.fork(sandbox)
+        with pytest.raises(RuntimeError, match="There is not snapshot for sandbox container_123."):
+            manager.fork(mock_job)

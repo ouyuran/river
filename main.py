@@ -10,7 +10,8 @@ def main():
 
     def create_hello_file():
         result = ShellTask("echo 'Hello, river!' > hello_river.txt").execute()
-        print(result)
+        ShellTask("mkdir /test").execute()
+        ShellTask("touch /test/aaa").execute()
 
     job1 = Job(
         "create_hello_file",
@@ -20,6 +21,10 @@ def main():
 
     def cat_hello_file():
         result = ShellTask("cat hello_river.txt").execute()
+        print(result)
+        result = ShellTask("ls", cwd="/test").execute()
+        print(result)
+        result = ShellTask("echo $TEST_ENV", env={"TEST_ENV": "test env"}).execute()
         print(result)
 
     job2 = Job(

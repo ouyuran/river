@@ -68,7 +68,7 @@ class TestLocalCommandExecutor:
         result = executor.run('test', cwd='/tmp')
         
         assert result.exited == 1
-        assert result.stderr == "Local run returns None"
+        assert result.stderr == "Local run returns None, command: test"
 
 
 class TestRemoteCommandExecutor:

@@ -141,9 +141,11 @@ class TestJobSandbox:
         assert job.sandbox is None
 
     @patch('sdk.src.job.docker_sandbox_manager.take_snapshot')
-    def test_job_run_creates_sandbox(self, mock_take_snapshot):
+    @patch('sdk.src.job.docker_sandbox_manager.destory')
+    def test_job_run_creates_sandbox(self, mock_destory, mock_take_snapshot):
         # Test that running a job creates sandbox when sandbox_creator is provided
         mock_sandbox = Mock(spec=BaseSandbox)
+        mock_sandbox.id = "test_container_123"  # Add id attribute for destory method
         mock_sandbox_creator = Mock(return_value=mock_sandbox)
         
         job = Job('test_job', lambda: 'result', sandbox_creator=mock_sandbox_creator)
@@ -155,9 +157,11 @@ class TestJobSandbox:
         assert status == Job.Status.SUCCESS
         assert result == 'result'
         mock_take_snapshot.assert_called_once_with(mock_sandbox)
+        mock_destory.assert_called_once_with(mock_sandbox)
 
     @patch('sdk.src.job.docker_sandbox_manager.take_snapshot')
-    def test_job_run_without_sandbox_creator(self, mock_take_snapshot):
+    @patch('sdk.src.job.docker_sandbox_manager.destory')
+    def test_job_run_without_sandbox_creator(self, mock_destory, mock_take_snapshot):
         # Test that running a job without sandbox_creator doesn't create sandbox
         job = Job('test_job', lambda: 'result')
         
@@ -167,12 +171,16 @@ class TestJobSandbox:
         assert status == Job.Status.SUCCESS
         assert result == 'result'
         mock_take_snapshot.assert_not_called()
+        mock_destory.assert_not_called()
+        
 
 
     @patch('sdk.src.job.docker_sandbox_manager.take_snapshot')
-    def test_job_sandbox_available_in_main(self, mock_take_snapshot):
+    @patch('sdk.src.job.docker_sandbox_manager.destory')
+    def test_job_sandbox_available_in_main(self, mock_destory, mock_take_snapshot):
         # Test that sandbox is available in main function through self parameter
         mock_sandbox = Mock(spec=BaseSandbox)
+        mock_sandbox.id = "test_container_456"  # Add id attribute for destory method
         mock_sandbox_creator = Mock(return_value=mock_sandbox)
         
         def main(self):
@@ -186,6 +194,7 @@ class TestJobSandbox:
         assert status == Job.Status.SUCCESS
         assert result == 'success'
         assert job.sandbox is mock_sandbox
+        mock_destory.assert_called_once_with(mock_sandbox)
 
     def test_job_sandbox_creator_exception_fails_job(self):
         # Test that exception in sandbox_creator causes job to fail

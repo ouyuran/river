@@ -59,7 +59,6 @@ class Job:
                 self.status = Job.Status.FAILED
                 self.result = None
                 self.error = e
-                raise(e)
             finally:
                 # TODO, add test
                 if self.sandbox:

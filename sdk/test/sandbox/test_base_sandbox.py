@@ -1,3 +1,4 @@
+from typing import Callable
 from invoke.runners import Result
 from sdk.src.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
 from unittest.mock import Mock
@@ -14,6 +15,9 @@ class ConcreteSandbox(BaseSandbox):
 
 class ConcreteSandboxManager(BaseSandboxManager):
     """Concrete implementation for testing BaseSandboxManager"""
+    def creator(self) -> Callable[[], BaseSandbox]:
+        return self.create
+    
     def create(self) -> BaseSandbox:
         return ConcreteSandbox("created_sandbox")
     
