@@ -43,7 +43,6 @@ class DockerSandbox(BaseSandbox):
         safe_container_id = shlex.quote(self.id)
         safe_command = shlex.quote(command)
         docker_cmd += f" {safe_container_id} bash -c {safe_command}"
-        print(docker_cmd)
         
         return self._executor.run(docker_cmd)
     

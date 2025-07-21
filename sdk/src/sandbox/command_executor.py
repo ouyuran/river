@@ -14,7 +14,7 @@ class CommandExecutor(ABC):
 
     @abstractmethod
     def run(
-        self, command: str, cwd: str = ".", env: Optional[dict[str, str]] = None
+        self, command: str, cwd: Optional[str] = None, env: Optional[dict[str, str]] = None
     ) -> Result:
         """Execute command and return result"""
         pass
@@ -24,9 +24,9 @@ class LocalCommandExecutor(CommandExecutor):
     """Local command executor"""
 
     def run(
-        self, command: str, cwd: str = ".", env: Optional[dict[str, str]] = None
+        self, command: str, cwd: Optional[str] = None, env: Optional[dict[str, str]] = None
     ) -> Result:
-        with Connection("localhost") as connection, connection.cd(cwd):
+        with Connection("localhost") as connection, connection.cd(cwd if cwd else '.'):
             result = connection.local(command, env=env or {}, hide=True, warn=True)
         return result if result else Result(exited=1, stderr=f"Local run returns None, command: {command}")
 
@@ -52,7 +52,7 @@ class RemoteCommandExecutor(CommandExecutor):
             self.connect_kwargs["password"] = password
 
     def run(
-        self, command: str, cwd: str = ".", env: Optional[dict[str, str]] = None
+        self, command: str, cwd: Optional[str] = None, env: Optional[dict[str, str]] = None
     ) -> Result:
         connection_params = {
             "host": self.host,
@@ -61,6 +61,6 @@ class RemoteCommandExecutor(CommandExecutor):
             "connect_kwargs": self.connect_kwargs,
         }
 
-        with Connection(**connection_params) as connection, connection.cd(cwd):
+        with Connection(**connection_params) as connection, connection.cd(cwd if cwd else '.'):
             result = connection.run(command, env=env or {}, hide=True, warn=True)
         return result

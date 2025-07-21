@@ -1,6 +1,6 @@
 from functools import partial
 from sdk.src.job import Job
-from sdk.src.task import ShellTask
+from sdk.src.task import bash
 from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
 
 
@@ -9,9 +9,9 @@ docker_sandbox_manager = DockerSandboxManager("ubuntu")
 def main():
 
     def create_hello_file():
-        result = ShellTask("echo 'Hello, river!' > hello_river.txt").execute()
-        ShellTask("mkdir /test").execute()
-        ShellTask("touch /test/aaa").execute()
+        result = bash("echo 'Hello, river!' > hello_river.txt")
+        bash("mkdir /test")
+        bash("touch /test/aaa")
 
     job1 = Job(
         "create_hello_file",
@@ -20,11 +20,11 @@ def main():
     )
 
     def cat_hello_file():
-        result = ShellTask("cat hello_river.txt").execute()
+        result = bash("cat hello_river.txt")
         print(result)
-        result = ShellTask("ls", cwd="/test").execute()
+        result = bash("ls", cwd="/test")
         print(result)
-        result = ShellTask("echo $TEST_ENV", env={"TEST_ENV": "test env"}).execute()
+        result = bash("echo $TEST_ENV", env={"TEST_ENV": "test env"})
         print(result)
 
     job2 = Job(
