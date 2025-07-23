@@ -189,3 +189,31 @@ class TestDockerSandboxManager:
 
         with pytest.raises(RuntimeError, match="There is not snapshot for sandbox container_123."):
             manager.fork(mock_job)
+
+    def test_creator_returns_callable(self):
+        manager = DockerSandboxManager()
+        image = "ubuntu:24.04"
+        
+        creator_func = manager.creator(image)
+        
+        # Verify it returns a callable
+        assert callable(creator_func)
+
+    def test_creator_callable_creates_sandbox(self):
+        manager = DockerSandboxManager()
+        mock_executor = Mock()
+        manager._executor = mock_executor
+        image = "ubuntu:24.04"
+
+        # Mock successful docker run
+        mock_result = Mock()
+        mock_result.stdout = "created_container_789\n"
+        mock_executor.run.return_value = mock_result
+
+        creator_func = manager.creator(image)
+        result = creator_func()
+
+        # Verify the creator function calls create with the correct image
+        mock_executor.run.assert_called_once_with(f"docker run -d {image} tail -f /dev/null")
+        assert isinstance(result, DockerSandbox)
+        assert result.id == "created_container_789"

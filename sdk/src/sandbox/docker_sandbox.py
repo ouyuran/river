@@ -64,7 +64,6 @@ class DockerSandboxManager(BaseSandboxManager):
     def _create_executor(self,host: str) -> CommandExecutor:
         return LocalCommandExecutor() if host == "localhost" else RemoteCommandExecutor(host)
     
-    # TODO, test
     def creator(self, image: str) -> Callable[[], BaseSandbox]:
         return partial(self.create, image)
 
