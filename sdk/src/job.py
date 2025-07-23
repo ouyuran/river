@@ -9,7 +9,7 @@ from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
 
 
 job_context = ContextVar('river-job')
-docker_sandbox_manager = DockerSandboxManager("ubuntu")
+docker_sandbox_manager = DockerSandboxManager()
 
 class Job(ABC):
     class Status(Enum):

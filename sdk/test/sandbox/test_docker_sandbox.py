@@ -64,23 +64,21 @@ class TestDockerSandboxManager:
 
     @patch('sdk.src.sandbox.docker_sandbox.LocalCommandExecutor')
     def test_init_localhost(self, mock_local_executor):
-        manager = DockerSandboxManager(self.image, self.host)
+        manager = DockerSandboxManager(self.host)
 
-        assert manager.image == self.image
         assert manager._host == self.host
         mock_local_executor.assert_called_once()
 
     @patch('sdk.src.sandbox.docker_sandbox.RemoteCommandExecutor')
     def test_init_remote_host(self, mock_remote_executor):
         remote_host = "remote.example.com"
-        manager = DockerSandboxManager(self.image, remote_host)
+        manager = DockerSandboxManager(remote_host)
 
-        assert manager.image == self.image
         assert manager._host == remote_host
         mock_remote_executor.assert_called_once_with(remote_host)
 
     def test_create(self):
-        manager = DockerSandboxManager(self.image)
+        manager = DockerSandboxManager()
         mock_executor = Mock()
         manager._executor = mock_executor
 
@@ -96,7 +94,7 @@ class TestDockerSandboxManager:
         assert result.id == "container_id_123"
 
     def test_destory(self):
-        manager = DockerSandboxManager(self.image)
+        manager = DockerSandboxManager()
         mock_executor = Mock()
         manager._executor = mock_executor
 
@@ -111,7 +109,7 @@ class TestDockerSandboxManager:
 
     @patch('uuid.uuid4')
     def test_take_snapshot_success(self, mock_uuid):
-        manager = DockerSandboxManager(self.image)
+        manager = DockerSandboxManager()
         mock_executor = Mock()
         manager._executor = mock_executor
 
@@ -135,7 +133,7 @@ class TestDockerSandboxManager:
 
     @patch('uuid.uuid4')
     def test_take_snapshot_failure(self, mock_uuid):
-        manager = DockerSandboxManager(self.image)
+        manager = DockerSandboxManager()
         mock_executor = Mock()
         manager._executor = mock_executor
 
@@ -156,7 +154,7 @@ class TestDockerSandboxManager:
             manager.take_snapshot(sandbox)
 
     def test_fork_success(self):
-        manager = DockerSandboxManager(self.image)
+        manager = DockerSandboxManager()
         mock_executor = Mock()
         manager._executor = mock_executor
 
@@ -180,7 +178,7 @@ class TestDockerSandboxManager:
         assert result.id == "forked_container_456"
 
     def test_fork_failure_no_snapshot(self):
-        manager = DockerSandboxManager(self.image)
+        manager = DockerSandboxManager()
 
         # Create sandbox without snapshot
         sandbox = DockerSandbox("container_123", Mock())

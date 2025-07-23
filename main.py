@@ -3,7 +3,7 @@ from sdk.src.task import bash
 from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
 
 
-docker_sandbox_manager = DockerSandboxManager("ubuntu")
+docker_sandbox_manager = DockerSandboxManager()
 
 class CreateHelloFileJob(Job):
     def __init__(self, name: str, sandbox_creator=None):

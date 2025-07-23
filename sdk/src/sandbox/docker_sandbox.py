@@ -56,10 +56,8 @@ class DockerSandbox(BaseSandbox):
     
 
 class DockerSandboxManager(BaseSandboxManager):
-    def __init__(self, image: str, host: str = "localhost"):
+    def __init__(self, host: str = "localhost"):
         super().__init__()
-        # TODO, remove this one
-        self.image: str = image
         self._host: str = host
         self._executor: CommandExecutor = self._create_executor(host)
     
