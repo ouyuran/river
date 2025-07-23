@@ -6,20 +6,21 @@ from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
 
 docker_sandbox_manager = DockerSandboxManager("ubuntu")
 
-def main():
+class CreateHelloFileJob(Job):
+    def __init__(self, name: str, sandbox_creator=None):
+        super().__init__(name, sandbox_creator=sandbox_creator)
 
-    def create_hello_file():
-        result = bash("echo 'Hello, river!' > hello_river.txt")
+    def main(self):
+        bash("echo 'Hello, river!' > hello_river.txt")
         bash("mkdir /test")
         bash("touch /test/aaa")
 
-    job1 = Job(
-        "create_hello_file",
-        main=create_hello_file,
-        sandbox_creator=docker_sandbox_manager.creator(image="ubuntu")
-    )
+class CatHelloFileJob(Job):
+    def __init__(self, name: str, create_job: CreateHelloFileJob, sandbox_creator=None):
+        super().__init__(name, sandbox_creator=sandbox_creator)
+        self._join({"create_job": create_job})
 
-    def cat_hello_file():
+    def main(self):
         result = bash("cat hello_river.txt")
         print(result)
         result = bash("ls", cwd="/test")
@@ -27,13 +28,16 @@ def main():
         result = bash("echo $TEST_ENV", env={"TEST_ENV": "test env"})
         print(result)
 
-    job2 = Job(
+def main():
+
+    job1 = CreateHelloFileJob(
+        "create_hello_file",
+        sandbox_creator=docker_sandbox_manager.creator(image="ubuntu")
+    )
+    job2 = CatHelloFileJob(
         "cat_hello_file",
-        main=cat_hello_file,
-        sandbox_creator=docker_sandbox_manager.forker(job1),
-        upstreams={
-            "create_job": job1
-        }
+        create_job= job1,
+        sandbox_creator=docker_sandbox_manager.forker(job1)
     )
 
     job2.run()

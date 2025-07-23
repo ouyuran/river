@@ -4,10 +4,47 @@ from unittest.mock import Mock, patch
 from sdk.src.sandbox.base_sandbox import BaseSandbox
 
 
+# Concrete Job implementations for testing
+class SimpleJob(Job):
+    def __init__(self, name: str, return_value: str, sandbox_creator=None, upstreams=None):
+        super().__init__(name, sandbox_creator, upstreams)
+        self.return_value = return_value
+    
+    def main(self):
+        return self.return_value
+
+
+class FailingJob(Job):
+    def __init__(self, name: str, error_message: str, sandbox_creator=None, upstreams=None):
+        super().__init__(name, sandbox_creator, upstreams)
+        self.error_message = error_message
+    
+    def main(self):
+        raise Exception(self.error_message)
+
+
+class CallbackJob(Job):
+    def __init__(self, name: str, callback, sandbox_creator=None, upstreams=None):
+        super().__init__(name, sandbox_creator, upstreams)
+        self.callback = callback
+    
+    def main(self):
+        return self.callback()
+
+
+class UpstreamAwareJob(Job):
+    def __init__(self, name: str, callback, sandbox_creator=None, upstreams=None):
+        super().__init__(name, sandbox_creator, upstreams)
+        self.callback = callback
+    
+    def main(self):
+        return self.callback(self)
+
+
 class TestJob:
 
     def test_job_init(self):
-        a = Job('a', lambda: 'A')
+        a = SimpleJob('a', 'A')
         assert a.name == 'a'
         assert a.status == Job.Status.PENDING
         assert a.result is None
@@ -15,7 +52,7 @@ class TestJob:
 
 
     def test_job_run(self):
-        a = Job('a', lambda: 'A')
+        a = SimpleJob('a', 'A')
         status, result, error = a.run() 
 
         assert a.name == 'a'
@@ -27,9 +64,7 @@ class TestJob:
 
 
     def test_job_run_failed(self):
-        def main(self):
-            raise Exception("Failed")
-        a = Job('a', main)
+        a = FailingJob('a', "Failed")
 
         status, result, error = a.run()
 
@@ -42,7 +77,7 @@ class TestJob:
         assert str(error) == "Failed"
 
     def test_job_run_already_running(self):
-        a = Job('a', lambda: 'A')
+        a = SimpleJob('a', 'A')
         a.run()
         # run again should not raise, should return (status, result)
         status, result, _ = a.run()
@@ -56,8 +91,8 @@ class TestJob:
         def a_main():
             assert b_holder['b'].status == Job.Status.PENDING
             return 'A'
-        a = Job('a', a_main)
-        b = Job('b', lambda a: a, upstreams={'a': a})
+        a = CallbackJob('a', a_main)
+        b = SimpleJob('b', 'B', upstreams={'a': a})
         b_holder['b'] = b
 
         b.run()
@@ -67,10 +102,8 @@ class TestJob:
 
 
     def test_job_upstream_fail_downstream_skip(self):
-        def a_main():
-            raise RuntimeError("fail a")
-        a = Job('a', a_main)
-        b = Job('b', lambda a: a, upstreams={'a': a})
+        a = FailingJob('a', "fail a")
+        b = SimpleJob('b', 'B', upstreams={'a': a})
 
         status, result, _ = b.run()
 
@@ -81,16 +114,21 @@ class TestJob:
 
 
     def test_job_main_param_not_match_upstream(self):
-        a = Job('a', lambda: 1)
-        b = Job('b', lambda: 2)
-        c = Job('c', lambda missing: missing, upstreams={'a': a, 'b': b})
-        with pytest.raises(ValueError, match="do not match any upstream key"):
-            c.run()
+        # This test needs to be updated since Job.main() doesn't take upstream parameters anymore
+        # The upstream values would need to be accessed differently in the new architecture
+        a = SimpleJob('a', 1)
+        b = SimpleJob('b', 2)
+        c = SimpleJob('c', 'C', upstreams={'a': a, 'b': b})
+        
+        # This test may not be relevant anymore with the new architecture
+        # where main() doesn't receive upstream parameters directly
+        status, result, _ = c.run()
+        assert status == Job.Status.SUCCESS
 
 
     def test_job_cycle_detection_raises(self):
-        a = Job('a', lambda: 1)
-        b = Job('b', lambda a: a, upstreams={'a': a})
+        a = SimpleJob('a', 1)
+        b = SimpleJob('b', 2, upstreams={'a': a})
 
         with pytest.raises(ValueError, match="would create a cycle"):
             a._join({'b': b})
@@ -109,10 +147,10 @@ class TestJob:
             nonlocal fn_call_count
             fn_call_count += 1
             return fn_call_count
-        a = Job('a', a_main)
-        b = Job('b', lambda: 2, upstreams={'a': a})
-        c = Job('c', lambda: 3, upstreams={'a': a})
-        d = Job('d', lambda: 4, upstreams={'b': b, 'c': c})
+        a = CallbackJob('a', a_main)
+        b = SimpleJob('b', 2, upstreams={'a': a})
+        c = SimpleJob('c', 3, upstreams={'a': a})
+        d = SimpleJob('d', 4, upstreams={'b': b, 'c': c})
 
         d.run()
 
@@ -128,14 +166,14 @@ class TestJobSandbox:
     def test_job_init_with_sandbox_creator(self):
         # Test Job initialization with sandbox_creator
         mock_sandbox_creator = Mock()
-        job = Job('test_job', lambda: 'result', sandbox_creator=mock_sandbox_creator)
+        job = SimpleJob('test_job', 'result', sandbox_creator=mock_sandbox_creator)
         
         assert job._sandbox_creator is mock_sandbox_creator
         assert job.sandbox is None
 
     def test_job_init_without_sandbox_creator(self):
         # Test Job initialization without sandbox_creator
-        job = Job('test_job', lambda: 'result')
+        job = SimpleJob('test_job', 'result')
         
         assert job._sandbox_creator is None
         assert job.sandbox is None
@@ -148,7 +186,7 @@ class TestJobSandbox:
         mock_sandbox.id = "test_container_123"  # Add id attribute for destory method
         mock_sandbox_creator = Mock(return_value=mock_sandbox)
         
-        job = Job('test_job', lambda: 'result', sandbox_creator=mock_sandbox_creator)
+        job = SimpleJob('test_job', 'result', sandbox_creator=mock_sandbox_creator)
         
         status, result, _ = job.run()
         
@@ -163,7 +201,7 @@ class TestJobSandbox:
     @patch('sdk.src.job.docker_sandbox_manager.destory')
     def test_job_run_without_sandbox_creator(self, mock_destory, mock_take_snapshot):
         # Test that running a job without sandbox_creator doesn't create sandbox
-        job = Job('test_job', lambda: 'result')
+        job = SimpleJob('test_job', 'result')
         
         status, result, _ = job.run()
         
@@ -183,11 +221,11 @@ class TestJobSandbox:
         mock_sandbox.id = "test_container_456"  # Add id attribute for destory method
         mock_sandbox_creator = Mock(return_value=mock_sandbox)
         
-        def main(self):
-            assert self.sandbox is mock_sandbox
+        def main_callback(job_self):
+            assert job_self.sandbox is mock_sandbox
             return 'success'
         
-        job = Job('test_job', main, sandbox_creator=mock_sandbox_creator)
+        job = UpstreamAwareJob('test_job', main_callback, sandbox_creator=mock_sandbox_creator)
         
         status, result, _ = job.run()
         
@@ -200,7 +238,7 @@ class TestJobSandbox:
         # Test that exception in sandbox_creator causes job to fail
         mock_sandbox_creator = Mock(side_effect=Exception("Sandbox creation failed"))
         
-        job = Job('test_job', lambda: 'result', sandbox_creator=mock_sandbox_creator)
+        job = SimpleJob('test_job', 'result', sandbox_creator=mock_sandbox_creator)
         
         status, result, _ = job.run()
         

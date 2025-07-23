@@ -1,5 +1,6 @@
 import inspect
 
+from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from enum import Enum
 from typing import Callable, Any, Optional
@@ -10,7 +11,7 @@ from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
 job_context = ContextVar('river-job')
 docker_sandbox_manager = DockerSandboxManager("ubuntu")
 
-class Job:
+class Job(ABC):
     class Status(Enum):
         PENDING = "pending"
         RUNNING = "running"
@@ -21,12 +22,10 @@ class Job:
     def __init__(
         self,
         name: str,
-        main: Callable[..., Any],
         sandbox_creator: Optional[Callable[[], BaseSandbox]] = None,
         upstreams: Optional[dict[str, 'Job']] = None,
     ):
         self.name = name
-        self._main = main
         self.result = None
         self._upstreams: dict[str, Job] = {}
         self.status = Job.Status.PENDING
@@ -36,14 +35,16 @@ class Job:
         if upstreams:
             self._join(upstreams)
 
-    def run(self, validate=True):
+    @abstractmethod
+    def main(self) -> Any:
+        """Abstract method that must be implemented by subclasses."""
+        pass
+
+    def run(self):
         token = job_context.set(self)
         # TODO: this could be a problem for async jobs
         if self.status == Job.Status.RUNNING:
             raise RuntimeError(f"Job '{self.name}' is already running.")
-
-        if validate:
-            self._validate_all()
 
         if not self._run_already_finished() and not self._should_skip_due_to_upstream():
             try:
@@ -93,51 +94,20 @@ class Job:
         path.pop()
         return None
 
-
-    def _validate_all(self, visited=None):
-        if visited is None:
-            visited = set()
-        if id(self) in visited:
-            return
-        visited.add(id(self))
-        sig = inspect.signature(self._main)
-        missing = []
-        for param in sig.parameters.values():
-            if param.name == 'self':
-                continue
-            if param.name not in self._upstreams:
-                missing.append(param.name)
-        if missing:
-            available = ', '.join(self._upstreams.keys())
-            raise ValueError(f"Job '{self.name}' main() parameters {missing} do not match any upstream key. Available keys: {available}")
-        for job in self._upstreams.values():
-            job._validate_all(visited)
-
     def _run_already_finished(self):
         return self.status in (Job.Status.SUCCESS, Job.Status.FAILED, Job.Status.SKIPPED)
 
     def _should_skip_due_to_upstream(self):
         for job in self._upstreams.values():
-            job.run(validate=False)
+            job.run()
             if job.status in (Job.Status.FAILED, Job.Status.SKIPPED):
                 self.status = Job.Status.SKIPPED
                 self.result = None
                 return True
         return False
 
-    def _prepare_main_kwargs(self):
-        sig = inspect.signature(self._main)
-        kwargs = {}
-        for param in sig.parameters.values():
-            if param.name == 'self':
-                kwargs['self'] = self
-            elif param.name in self._upstreams:
-                kwargs[param.name] = self._upstreams[param.name]
-        return kwargs
-
     def _execute_main(self):
         self.status = Job.Status.RUNNING
-        kwargs = self._prepare_main_kwargs()
-        result = self._main(**kwargs)
+        result = self.main()
         self.status = Job.Status.SUCCESS
         self.result = result
