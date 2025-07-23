@@ -92,7 +92,7 @@ class TestJob:
             assert b_holder['b'].status == Job.Status.PENDING
             return 'A'
         a = CallbackJob('a', a_main)
-        b = SimpleJob('b', 'B', upstreams={'a': a})
+        b = SimpleJob('b', 'B', upstreams=[a])
         b_holder['b'] = b
 
         b.run()
@@ -103,7 +103,7 @@ class TestJob:
 
     def test_job_upstream_fail_downstream_skip(self):
         a = FailingJob('a', "fail a")
-        b = SimpleJob('b', 'B', upstreams={'a': a})
+        b = SimpleJob('b', 'B', upstreams=[a])
 
         status, result, _ = b.run()
 
@@ -116,9 +116,9 @@ class TestJob:
     def test_job_main_param_not_match_upstream(self):
         # This test needs to be updated since Job.main() doesn't take upstream parameters anymore
         # The upstream values would need to be accessed differently in the new architecture
-        a = SimpleJob('a', 1)
-        b = SimpleJob('b', 2)
-        c = SimpleJob('c', 'C', upstreams={'a': a, 'b': b})
+        a = SimpleJob('a', '1')
+        b = SimpleJob('b', '2')
+        c = SimpleJob('c', 'C', upstreams=[a, b])
         
         # This test may not be relevant anymore with the new architecture
         # where main() doesn't receive upstream parameters directly
@@ -127,11 +127,11 @@ class TestJob:
 
 
     def test_job_cycle_detection_raises(self):
-        a = SimpleJob('a', 1)
-        b = SimpleJob('b', 2, upstreams={'a': a})
+        a = SimpleJob('a', '1')
+        b = SimpleJob('b', '2', upstreams=[a])
 
         with pytest.raises(ValueError, match="would create a cycle"):
-            a._join({'b': b})
+            a._join([b])
 
 
     def test_job_diamond_dependency(self):
@@ -148,9 +148,9 @@ class TestJob:
             fn_call_count += 1
             return fn_call_count
         a = CallbackJob('a', a_main)
-        b = SimpleJob('b', 2, upstreams={'a': a})
-        c = SimpleJob('c', 3, upstreams={'a': a})
-        d = SimpleJob('d', 4, upstreams={'b': b, 'c': c})
+        b = SimpleJob('b', '2', upstreams=[a])
+        c = SimpleJob('c', '3', upstreams=[a])
+        d = SimpleJob('d', "4", upstreams=[b, c])
 
         d.run()
 

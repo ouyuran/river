@@ -23,11 +23,11 @@ class Job(ABC):
         self,
         name: str,
         sandbox_creator: Optional[Callable[[], BaseSandbox]] = None,
-        upstreams: Optional[dict[str, 'Job']] = None,
+        upstreams: Optional[list['Job']] = None,
     ):
         self.name = name
         self.result = None
-        self._upstreams: dict[str, Job] = {}
+        self._upstreams: list[Job] = []
         self.status = Job.Status.PENDING
         self.sandbox: Any = None  # Use Any to avoid forcing users to specify generic types
         self._sandbox_creator = sandbox_creator
@@ -69,8 +69,8 @@ class Job(ABC):
         print(self.name, self.status, self.result, self.error)
         return self.status, self.result, self.error
 
-    def _join(self, upstreams: dict[str, 'Job']):
-        for key, job in upstreams.items():
+    def _join(self, upstreams: list['Job']):
+        for job in upstreams:
             cycle_path = self._find_cycle_path(job, self)
             if cycle_path:
                 if cycle_path[0] is not cycle_path[-1]:
@@ -78,8 +78,8 @@ class Job(ABC):
                 cycle_str = ' -> '.join(j.name for j in cycle_path)
                 msg = f"Joining {job.name} would create a cycle with {self.name}: {cycle_str}"
                 raise ValueError(msg)
-            if key not in self._upstreams:
-                self._upstreams[key] = job
+            if job not in self._upstreams:
+                self._upstreams.append(job)
 
     def _find_cycle_path(self, start: 'Job', target: 'Job', path=None) -> Optional[list['Job']]:
         if path is None:
@@ -87,7 +87,7 @@ class Job(ABC):
         path.append(start)
         if start is target:
             return path.copy()
-        for upstream in start._upstreams.values():
+        for upstream in start._upstreams:
             result = self._find_cycle_path(upstream, target, path)
             if result:
                 return result
@@ -98,7 +98,7 @@ class Job(ABC):
         return self.status in (Job.Status.SUCCESS, Job.Status.FAILED, Job.Status.SKIPPED)
 
     def _should_skip_due_to_upstream(self):
-        for job in self._upstreams.values():
+        for job in self._upstreams:
             job.run()
             if job.status in (Job.Status.FAILED, Job.Status.SKIPPED):
                 self.status = Job.Status.SKIPPED

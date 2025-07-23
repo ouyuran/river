@@ -1,4 +1,3 @@
-from functools import partial
 from sdk.src.job import Job
 from sdk.src.task import bash
 from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
@@ -17,8 +16,10 @@ class CreateHelloFileJob(Job):
 
 class CatHelloFileJob(Job):
     def __init__(self, name: str, create_job: CreateHelloFileJob, sandbox_creator=None):
-        super().__init__(name, sandbox_creator=sandbox_creator)
-        self._join({"create_job": create_job})
+        super().__init__(name,
+            sandbox_creator=sandbox_creator,
+            upstreams=[create_job]
+        )
 
     def main(self):
         result = bash("cat hello_river.txt")
