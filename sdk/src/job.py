@@ -1,15 +1,27 @@
-import inspect
-
 from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from enum import Enum
 from typing import Callable, Any, Optional
 from sdk.src.sandbox.base_sandbox import BaseSandbox
-from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
 
 
-job_context = ContextVar('river-job')
-docker_sandbox_manager = DockerSandboxManager()
+class JobContext():
+    context = ContextVar('job-context')
+
+    def __init__(self, job: 'Job'):
+        self._job = job
+
+    def __enter__(self):
+        self._token = JobContext.context.set(self._job)
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        JobContext.context.reset(self._token)
+
+    @staticmethod
+    def get_current():
+        return JobContext.context.get()
+
 
 class Job(ABC):
     class Status(Enum):
@@ -41,31 +53,27 @@ class Job(ABC):
         pass
 
     def run(self):
-        token = job_context.set(self)
+        from sdk.src.river import get_current_sandbox_manager
         # TODO: this could be a problem for async jobs
         if self.status == Job.Status.RUNNING:
             raise RuntimeError(f"Job '{self.name}' is already running.")
-
+        
         if not self._run_already_finished() and not self._should_skip_due_to_upstream():
             try:
                 if self._sandbox_creator:
                     self.sandbox = self._sandbox_creator()
-                self._execute_main()
+                with JobContext(self):
+                    self._execute_main()
                 if self.sandbox:
-                    docker_sandbox_manager.take_snapshot(self.sandbox)
-                # TODO, take snapshot here, maybe we should set SandboxManager to current river context?
-                # Rivers holds manager and Job uses it
-                # Job holds sandbox and Taks uses it
+                    get_current_sandbox_manager().take_snapshot(self.sandbox)
             except Exception as e:
                 self.status = Job.Status.FAILED
                 self.result = None
                 self.error = e
             finally:
-                # TODO, add test
                 if self.sandbox:
-                    docker_sandbox_manager.destory(self.sandbox)
+                    get_current_sandbox_manager().destory(self.sandbox)
 
-        job_context.reset(token)
         print(self.name, self.status, self.result, self.error)
         return self.status, self.result, self.error
 
@@ -111,3 +119,14 @@ class Job(ABC):
         result = self.main()
         self.status = Job.Status.SUCCESS
         self.result = result
+
+class JobContextError(Exception):
+    """Raised when job context operations are called outside of a job context."""
+    pass
+
+def get_current_job() -> Job:
+    """Get the current Job instance from context."""
+    try:
+        return JobContext.get_current()
+    except LookupError:
+        raise JobContextError("get_current_job() can only be called within a job context")

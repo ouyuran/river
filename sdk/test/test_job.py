@@ -1,5 +1,5 @@
 import pytest
-from sdk.src.job import Job
+from sdk.src.job import Job, JobContext, get_current_job, JobContextError
 from unittest.mock import Mock, patch
 from sdk.src.sandbox.base_sandbox import BaseSandbox
 
@@ -163,6 +163,23 @@ class TestJob:
 
 class TestJobSandbox:
 
+    @pytest.fixture
+    def mock_manager(self):
+        """Fixture for mocked sandbox manager."""
+        return Mock()
+
+    @pytest.fixture
+    def mock_sandbox(self):
+        """Fixture for mock sandbox."""
+        sandbox = Mock(spec=BaseSandbox)
+        sandbox.id = "test_container_123"
+        return sandbox
+
+    @pytest.fixture
+    def mock_sandbox_creator(self, mock_sandbox):
+        """Fixture for mock sandbox creator."""
+        return Mock(return_value=mock_sandbox)
+
     def test_job_init_with_sandbox_creator(self):
         # Test Job initialization with sandbox_creator
         mock_sandbox_creator = Mock()
@@ -178,14 +195,10 @@ class TestJobSandbox:
         assert job._sandbox_creator is None
         assert job.sandbox is None
 
-    @patch('sdk.src.job.docker_sandbox_manager.take_snapshot')
-    @patch('sdk.src.job.docker_sandbox_manager.destory')
-    def test_job_run_creates_sandbox(self, mock_destory, mock_take_snapshot):
+    @patch('sdk.src.river.get_current_sandbox_manager')
+    def test_job_run_creates_sandbox(self, mock_get_manager, mock_manager, mock_sandbox, mock_sandbox_creator):
         # Test that running a job creates sandbox when sandbox_creator is provided
-        mock_sandbox = Mock(spec=BaseSandbox)
-        mock_sandbox.id = "test_container_123"  # Add id attribute for destory method
-        mock_sandbox_creator = Mock(return_value=mock_sandbox)
-        
+        mock_get_manager.return_value = mock_manager
         job = SimpleJob('test_job', 'result', sandbox_creator=mock_sandbox_creator)
         
         status, result, _ = job.run()
@@ -194,13 +207,13 @@ class TestJobSandbox:
         assert job.sandbox is mock_sandbox
         assert status == Job.Status.SUCCESS
         assert result == 'result'
-        mock_take_snapshot.assert_called_once_with(mock_sandbox)
-        mock_destory.assert_called_once_with(mock_sandbox)
+        mock_manager.take_snapshot.assert_called_once_with(mock_sandbox)
+        mock_manager.destory.assert_called_once_with(mock_sandbox)
 
-    @patch('sdk.src.job.docker_sandbox_manager.take_snapshot')
-    @patch('sdk.src.job.docker_sandbox_manager.destory')
-    def test_job_run_without_sandbox_creator(self, mock_destory, mock_take_snapshot):
+    @patch('sdk.src.river.get_current_sandbox_manager')
+    def test_job_run_without_sandbox_creator(self, mock_get_manager, mock_manager):
         # Test that running a job without sandbox_creator doesn't create sandbox
+        mock_get_manager.return_value = mock_manager
         job = SimpleJob('test_job', 'result')
         
         status, result, _ = job.run()
@@ -208,18 +221,13 @@ class TestJobSandbox:
         assert job.sandbox is None
         assert status == Job.Status.SUCCESS
         assert result == 'result'
-        mock_take_snapshot.assert_not_called()
-        mock_destory.assert_not_called()
-        
+        mock_manager.take_snapshot.assert_not_called()
+        mock_manager.destory.assert_not_called()
 
-
-    @patch('sdk.src.job.docker_sandbox_manager.take_snapshot')
-    @patch('sdk.src.job.docker_sandbox_manager.destory')
-    def test_job_sandbox_available_in_main(self, mock_destory, mock_take_snapshot):
+    @patch('sdk.src.river.get_current_sandbox_manager')
+    def test_job_sandbox_available_in_main(self, mock_get_manager, mock_manager, mock_sandbox, mock_sandbox_creator):
         # Test that sandbox is available in main function through self parameter
-        mock_sandbox = Mock(spec=BaseSandbox)
-        mock_sandbox.id = "test_container_456"  # Add id attribute for destory method
-        mock_sandbox_creator = Mock(return_value=mock_sandbox)
+        mock_get_manager.return_value = mock_manager
         
         def main_callback(job_self):
             assert job_self.sandbox is mock_sandbox
@@ -232,7 +240,7 @@ class TestJobSandbox:
         assert status == Job.Status.SUCCESS
         assert result == 'success'
         assert job.sandbox is mock_sandbox
-        mock_destory.assert_called_once_with(mock_sandbox)
+        mock_manager.destory.assert_called_once_with(mock_sandbox)
 
     def test_job_sandbox_creator_exception_fails_job(self):
         # Test that exception in sandbox_creator causes job to fail
@@ -247,3 +255,61 @@ class TestJobSandbox:
         assert job.sandbox is None
         assert job.error is not None
         assert str(job.error) == "Sandbox creation failed"
+
+
+class TestJobContext:
+    """Test cases for JobContext class."""
+
+    def test_job_context_init(self):
+        """Test JobContext initialization with a job."""
+        job = SimpleJob('test_job', 'result')
+        context = JobContext(job)
+        
+        assert context._job is job
+
+    def test_job_context_as_context_manager(self):
+        """Test JobContext works as context manager."""
+        job = SimpleJob('test_job', 'result')
+        
+        # Initially no job in context
+        with pytest.raises(JobContextError):
+            get_current_job()
+        
+        # Inside context manager, job should be available
+        with JobContext(job):
+            current_job = get_current_job()
+            assert current_job is job
+        
+        # After exiting context, job should be cleared
+        with pytest.raises(JobContextError):
+            get_current_job()
+
+    def test_job_context_get_current_static_method(self):
+        """Test JobContext.get_current() static method."""
+        job = SimpleJob('test_job', 'result')
+        
+        with JobContext(job):
+            # Should return the same job as get_current_job()
+            current_from_context = JobContext.get_current()
+            current_from_function = get_current_job()
+            assert current_from_context is current_from_function
+            assert current_from_context is job
+
+    def test_job_context_exception_in_context_still_cleans_up(self):
+        """Test that JobContext cleans up even if exception occurs inside."""
+        job = SimpleJob('test_job', 'result')
+        
+        # Verify context is cleaned up even if exception occurs inside
+        with pytest.raises(ValueError):
+            with JobContext(job):
+                assert get_current_job() is job
+                raise ValueError("Test exception")
+        
+        # Context should still be cleared after exception
+        with pytest.raises(JobContextError):
+            get_current_job()
+
+    def test_get_current_job_outside_context_raises_error(self):
+        """Test that get_current_job() raises JobContextError when called outside context."""
+        with pytest.raises(JobContextError, match="get_current_job\\(\\) can only be called within a job context"):
+            get_current_job()

@@ -1,5 +1,5 @@
 from typing import Dict, Optional
-from sdk.src.job import job_context
+from sdk.src.job import get_current_job
 from sdk.src.sandbox.command_executor import LocalCommandExecutor
 
 
@@ -22,7 +22,7 @@ class TaskExecutionError(Exception):
 
 
 def bash(command: str, cwd: Optional[str] = None, env: Optional[Dict[str, str]] = None):
-    job = job_context.get()
+    job = get_current_job()
     sandbox = job.sandbox
     
     if sandbox is None:

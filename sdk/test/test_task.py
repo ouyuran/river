@@ -64,13 +64,37 @@ class TestTaskExecutionError:
 class TestBashFunction:
     """Test cases for the bash function."""
 
-    @patch('sdk.src.task.job_context')
-    def test_bash_success_with_local_executor(self, mock_job_context):
-        """Test bash function success case with LocalCommandExecutor."""
-        # Mock job context with no sandbox
+    @pytest.fixture
+    def mock_job_no_sandbox(self):
+        """Fixture for job without sandbox."""
         mock_job = Mock()
         mock_job.sandbox = None
-        mock_job_context.get.return_value = mock_job
+        return mock_job
+
+    @pytest.fixture  
+    def mock_job_with_sandbox(self):
+        """Fixture for job with sandbox."""
+        mock_sandbox = Mock(spec=BaseSandbox)
+        mock_job = Mock()
+        mock_job.sandbox = mock_sandbox
+        return mock_job, mock_sandbox
+
+    @pytest.fixture
+    def mock_failed_result(self):
+        """Fixture for failed command result."""
+        def _create_result(stdout="", stderr="", exit_code=1):
+            mock_result = Mock()
+            mock_result.stdout = stdout
+            mock_result.stderr = stderr
+            mock_result.exited = exit_code
+            mock_result.ok = False
+            return mock_result
+        return _create_result
+
+    @patch('sdk.src.task.get_current_job')
+    def test_bash_success_with_local_executor(self, mock_get_current_job, mock_job_no_sandbox):
+        """Test bash function success case with LocalCommandExecutor."""
+        mock_get_current_job.return_value = mock_job_no_sandbox
         
         with patch('sdk.src.task.LocalCommandExecutor') as mock_executor_class:
             mock_executor = Mock()
@@ -84,14 +108,11 @@ class TestBashFunction:
                 env={"VAR": "value"}
             )
 
-    @patch('sdk.src.task.job_context')
-    def test_bash_success_with_sandbox(self, mock_job_context):
+    @patch('sdk.src.task.get_current_job')
+    def test_bash_success_with_sandbox(self, mock_get_current_job, mock_job_with_sandbox):
         """Test bash function success case with sandbox executor."""
-        # Mock job context with sandbox
-        mock_sandbox = Mock(spec=BaseSandbox)
-        mock_job = Mock()
-        mock_job.sandbox = mock_sandbox
-        mock_job_context.get.return_value = mock_job
+        mock_job, mock_sandbox = mock_job_with_sandbox
+        mock_get_current_job.return_value = mock_job
         
         bash("ls", cwd="/home", env={"PATH": "/usr/bin"})
         
@@ -101,24 +122,16 @@ class TestBashFunction:
             env={"PATH": "/usr/bin"}
         )
 
-    @patch('sdk.src.task.job_context')
-    def test_bash_failure_with_local_executor_raises_error(self, mock_job_context):
+    @patch('sdk.src.task.get_current_job')
+    def test_bash_failure_with_local_executor_raises_error(self, mock_get_current_job, 
+                                                          mock_job_no_sandbox, mock_failed_result):
         """Test bash function failure case with LocalCommandExecutor raises TaskExecutionError."""
-        # Mock job context with no sandbox
-        mock_job = Mock()
-        mock_job.sandbox = None
-        mock_job_context.get.return_value = mock_job
-        
-        # Mock failed result
-        mock_result = Mock()
-        mock_result.stdout = ""
-        mock_result.stderr = "command not found"
-        mock_result.exited = 127
-        mock_result.ok = False
+        mock_get_current_job.return_value = mock_job_no_sandbox
+        failed_result = mock_failed_result(stderr="command not found", exit_code=127)
         
         with patch('sdk.src.task.LocalCommandExecutor') as mock_executor_class:
             mock_executor = Mock()
-            mock_executor.run.return_value = mock_result
+            mock_executor.run.return_value = failed_result
             mock_executor_class.return_value = mock_executor
             
             with pytest.raises(TaskExecutionError) as exc_info:
@@ -130,22 +143,14 @@ class TestBashFunction:
             assert error.stderr == "command not found"
             assert error.exit_code == 127
 
-    @patch('sdk.src.task.job_context')
-    def test_bash_failure_with_sandbox_raises_error(self, mock_job_context):
+    @patch('sdk.src.task.get_current_job')
+    def test_bash_failure_with_sandbox_raises_error(self, mock_get_current_job, 
+                                                   mock_job_with_sandbox, mock_failed_result):
         """Test bash function failure case with sandbox raises TaskExecutionError."""
-        # Mock job context with sandbox
-        mock_sandbox = Mock(spec=BaseSandbox)
-        mock_job = Mock()
-        mock_job.sandbox = mock_sandbox
-        mock_job_context.get.return_value = mock_job
-        
-        # Mock failed result
-        mock_result = Mock()
-        mock_result.stdout = "partial output"
-        mock_result.stderr = "permission denied"
-        mock_result.exited = 1
-        mock_result.ok = False
-        mock_sandbox.execute.return_value = mock_result
+        mock_job, mock_sandbox = mock_job_with_sandbox
+        mock_get_current_job.return_value = mock_job
+        failed_result = mock_failed_result(stdout="partial output", stderr="permission denied", exit_code=1)
+        mock_sandbox.execute.return_value = failed_result
         
         with pytest.raises(TaskExecutionError) as exc_info:
             bash("rm /protected")

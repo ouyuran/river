@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, TypeVar, TYPE_CHECKING
+from typing import Any, Callable, Optional, TypeVar, TYPE_CHECKING
 from functools import partial
 from invoke.runners import Result
 
@@ -39,11 +39,11 @@ class BaseSandbox(ABC):
 class BaseSandboxManager(ABC):
 
     @abstractmethod
-    def creator(self) -> Callable[[], BaseSandbox]:
+    def creator(self, config: Any) -> Callable[[], BaseSandbox]:
         pass
     
     @abstractmethod
-    def create(self) -> BaseSandbox:
+    def create(self, config: Any) -> BaseSandbox:
         """Create the sandbox and return a BaseSandbox instance.
         
         Returns:
