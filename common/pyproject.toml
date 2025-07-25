@@ -1,0 +1,23 @@
+[project]
+name = "river-common"
+version = "0.1.0"
+description = "Common modules for river project."
+authors = [
+    { name = "Yuran Ou", email = "hello@ouyuran.com" }
+]
+requires-python = ">=3.12"
+readme = "README.md"
+
+dependencies = [
+    "pydantic>=2.11.7",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta" 

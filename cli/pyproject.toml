@@ -1,0 +1,27 @@
+[project]
+name = "river-cli"
+version = "0.1.0"
+description = "CLI modules for river project."
+authors = [
+    { name = "Yuran Ou", email = "hello@ouyuran.com" }
+]
+requires-python = ">=3.12"
+readme = "README.md"
+
+dependencies = [
+    "rich>=14.1.0",
+    "river-common",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[tool.uv.sources]
+river-common = { path = "../common", editable = true }
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta" 
