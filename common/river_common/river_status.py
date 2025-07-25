@@ -15,4 +15,4 @@ class RiverStatus(BaseModel):
         self.status = status
 
     def export(self):
-        print(self.model_dump_json())
+        print(self.model_dump_json(), flush=True)
