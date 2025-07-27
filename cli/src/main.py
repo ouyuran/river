@@ -1,89 +1,153 @@
 import subprocess
-import sys 
 import json
+import threading
+import queue
+from typing import Dict, Optional
 from rich.live import Live
 from rich.tree import Tree
 from rich.console import Console
 from river_common import Status
+from animated_label import AnimatedLabel
+from river_node import RiverNode
 
-def get_status_color(status: Status) -> str:
-    """Get color for status display"""
-    color_map = {
-        Status.PENDING: "yellow",
-        Status.RUNNING: "blue", 
-        Status.SUCCESS: "green",
-        Status.FAILED: "red",
-        Status.SKIPPED: "dim"
-    }
-    return color_map.get(status, "white")
+TARGET_FPS = 60  # Target frames per second for animations
 
-def create_tree_from_data():
-    """Run data.py and parse output to create tree structure"""
-    try:
-        # Run data.py as subprocess and capture output
-        result = subprocess.run(["uv", "run", "python", "src/data.py"], 
-                              capture_output=True, text=True, cwd=".")
-        
-        if result.returncode != 0:
-            return Tree("❌ Error running data.py")
-        
-        # Parse JSON output lines
-        lines = result.stdout.strip().split('\n')
-        items = []
-        
-        for line in lines:
-            if line.strip():
-                try:
-                    item = json.loads(line)
-                    items.append(item)
-                except json.JSONDecodeError:
-                    continue
-        
-        # Build tree structure
-        tree = Tree("🌊 River Status")
-        nodes = {}
-        
-        # First pass: create all nodes
-        for item in items:
-            status = Status(item['status'])
-            color = get_status_color(status)
-            
-            if item['type'] == 'river':
-                label = f"[{color}]{item['name']} ({status.value})[/{color}]"
-                tree.label = f"🌊 {label}"
-                nodes[item['id']] = tree
-            else:
-                if item['type'] == 'job':
-                    icon = "⚙️"
-                else:  # task
-                    icon = "📋"
-                
-                label = f"[{color}]{icon} {item['name']} ({status.value})[/{color}]"
-                node = Tree(label)
-                nodes[item['id']] = node
-        
-        # Second pass: build hierarchy  
-        for item in items:
-            if item['type'] != 'river' and item['parent_id'] in nodes:
-                parent = nodes[item['parent_id']]
-                child = nodes[item['id']]
-                parent.add(child)
-        
-        return tree
-        
-    except Exception as e:
-        return Tree(f"❌ Error: {str(e)}")
-
-def main():
-    """Main live display function"""
-    console = Console()
+class StreamingTreeRenderer:
+    def __init__(self):
+        self.console = Console()
+        self.nodes: Dict[str, RiverNode] = {}
+        self.data_queue = queue.Queue()
+        self.running = True
     
-    with Live(create_tree_from_data(), refresh_per_second=2, console=console) as live:
+    def update_or_create_node(self, item):
+        """Update existing node or create new one"""
+        item_id = item['id']
+        
+        if item_id in self.nodes:
+            # Update existing RiverNode
+            existing_node = self.nodes[item_id]
+            existing_node.update_item(item)
+            return existing_node
+        
+        # Create new RiverNode
+        parent_id = item.get('parent_id')
+        parent_node = self.nodes.get(parent_id) if parent_id else None
+        
+        river_node = RiverNode(item=item, parent=parent_node)
+        self.nodes[item_id] = river_node
+        
+        return river_node
+    
+    def process_item(self, item):
+        """Process a single item from the queue"""
+        river_node = self.update_or_create_node(item)
+        self.data_queue.task_done()
+        return river_node
+    
+    def wait_and_process_first_item(self):
+        """Wait for and process the first item from queue"""
+        item = self.data_queue.get(timeout=0.1)
+        return self.process_item(item)
+    
+    def process_rest_items(self):
+        """Process all remaining items in queue"""
         try:
             while True:
-                live.update(create_tree_from_data())
-        except KeyboardInterrupt:
-            console.print("\n👋 Goodbye!")
+                item = self.data_queue.get_nowait()
+                self.process_item(item)
+        except queue.Empty:
+            pass
+    
+    def is_process_finished(self, proc):
+        """Check if the subprocess has finished"""
+        return proc.poll() is not None
+    
+    def process_stream_data(self, proc):
+        """Process streaming data from subprocess"""
+        try:
+            for line in iter(proc.stdout.readline, ''):
+                if not line or not self.running:
+                    break
+                    
+                line = line.strip()
+                if line:
+                    try:
+                        item = json.loads(line)
+                        self.data_queue.put(item)
+                    except json.JSONDecodeError:
+                        continue
+        except Exception as e:
+            self.data_queue.put({'error': str(e)})
+        finally:
+            proc.stdout.close()
+    
+    def start_data_process(self):
+        """Start the data.py subprocess"""
+        try:
+            proc = subprocess.Popen(
+                ["uv", "run", "python", "src/data.py"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1  # Line buffered
+            )
+            
+            # Start thread to read from subprocess
+            thread = threading.Thread(target=self.process_stream_data, args=(proc,))
+            thread.daemon = True
+            thread.start()
+            
+            return proc, thread
+        except Exception as e:
+            self.data_queue.put({'error': f'Failed to start data process: {str(e)}'})
+            return None, None
+    
+    def _get_root_node(self, proc) -> Optional[RiverNode]:
+        root_node = None
+        while not root_node and self.running:
+            try:
+                root_node = self.wait_and_process_first_item()
+            except queue.Empty:
+                if self.is_process_finished(proc):
+                    self.console.print("❌ Process finished without data")
+                    return None
+                continue
+        return root_node
+
+    def run(self):
+        """Main rendering loop"""
+        proc, thread = self.start_data_process()
+        
+        if not proc:
+            self.console.print("❌ Failed to start data process")
+            return
+        
+        # Wait for first item to get the root tree node
+        root_node = self._get_root_node(proc)
+        if not root_node:
+            return
+            
+        with Live(root_node.tree_node, refresh_per_second=TARGET_FPS, console=self.console) as live:
+            try:
+                while self.running:
+                    try:
+                        self.wait_and_process_first_item()
+                        self.process_rest_items()
+                    except queue.Empty:
+                        if self.is_process_finished(proc):
+                            self.process_rest_items()
+                            break
+                        
+            except KeyboardInterrupt:
+                self.running = False
+                if proc:
+                    proc.terminate()
+                self.console.print("\n👋 Goodbye!")
+
+def main():
+    """Main entry point"""
+    renderer = StreamingTreeRenderer()
+    renderer.run()
 
 if __name__ == "__main__":
     main()

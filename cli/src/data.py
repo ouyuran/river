@@ -1,5 +1,6 @@
 from river_common import JobStatus, RiverStatus, Status, TaskStatus
 from time import sleep
+import sys
 
 r = RiverStatus(
     id='000',
@@ -60,9 +61,17 @@ t1 = TaskStatus(
 
 t1.set_status(Status.RUNNING)
 t1.export()
-sleep(1)
+sleep(0.5)
 t1.set_status(Status.SUCCESS)
 t1.export()
+
+for i in range(10):
+    TaskStatus(
+        id=f"{i}",
+        name="task-a",
+        parent_id="222"
+    ).export()
+    sleep(0.5)
 
 t2 = TaskStatus(
     id='t4',
