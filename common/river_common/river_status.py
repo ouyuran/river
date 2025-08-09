@@ -7,10 +7,10 @@ from river_common.shared import ModuleTypes, Status
 class RiverStatus(BaseModel):
     id: str
     name: str
+    parent_id: str | None = None
     status: Status = Status.PENDING
     type: Literal[ModuleTypes.RIVER] = ModuleTypes.RIVER
     
-
     def set_status(self, status: Status):
         self.status = status
 

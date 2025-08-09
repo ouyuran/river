@@ -62,6 +62,33 @@ class StreamingTreeRenderer:
         """Check if the subprocess has finished"""
         return proc.poll() is not None
     
+    def render_error_summary(self):
+        """Render summary of all failed items with error details"""
+        failed_nodes = [node for node in self.nodes.values() if node.item.get('status') == 'failed']
+        
+        if not failed_nodes:
+            return
+            
+        self.console.print("\n" + "="*60)
+        self.console.print("[bold red]❌ Error Summary[/bold red]")
+        self.console.print("="*60)
+        
+        for node in failed_nodes:
+            item = node.item
+            self.console.print(f"[bold red]• {item['name']}[/bold red] (ID: {item['id']})")
+            
+            error_msg = item.get('error')
+            error_type = item.get('error_type')
+            
+            if error_msg:
+                self.console.print(f"  [red]Error:[/red] {error_msg}")
+                if error_type:
+                    self.console.print(f"  [red]Type:[/red] {error_type}")
+            else:
+                self.console.print(f"  [red]Error:[/red] Failed without details")
+            
+            self.console.print()  # Empty line between errors
+    
     def process_stream_data(self, proc):
         """Process streaming data from subprocess"""
         try:
@@ -142,7 +169,10 @@ class StreamingTreeRenderer:
                 self.running = False
                 if proc:
                     proc.terminate()
-                self.console.print("\n👋 Goodbye!")
+        
+        # Show error summary after processing is complete
+        self.render_error_summary()
+        self.console.print("\n👋 Goodbye!")
 
 def main():
     """Main entry point"""
