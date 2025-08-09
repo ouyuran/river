@@ -1,1 +1,0 @@
-TREE_GUIDE_STYLE = "dim white"

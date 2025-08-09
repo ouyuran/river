@@ -13,19 +13,6 @@ j1 = JobStatus(
     parent_id='000'
 )
 
-j11 = JobStatus(
-    id='111-1',
-    name='job-1-1',
-    parent_id='111'
-)
-
-t11 = TaskStatus(
-    id='t1-1',
-    name="task-1-1",
-    parent_id="111-1"
-)
-
-
 j2 = JobStatus(
     id='222',
     name='job-2',
@@ -34,8 +21,6 @@ j2 = JobStatus(
 
 r.export()
 j1.export()
-j11.export()
-t11.export()
 j2.export()
 sleep(1)
 r.set_status(Status.RUNNING)
@@ -49,7 +34,7 @@ t1 = TaskStatus(
     name="task-1",
     parent_id="111"
 )
-t1.export()
+
 t1.set_status(Status.RUNNING)
 t1.export()
 sleep(1)
@@ -74,7 +59,7 @@ t1 = TaskStatus(
     name="task-a",
     parent_id="222"
 )
-t1.export()
+
 t1.set_status(Status.RUNNING)
 t1.export()
 sleep(0.5)

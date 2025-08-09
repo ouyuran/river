@@ -1,5 +1,4 @@
 import time
-from const import TREE_GUIDE_STYLE
 from rich.text import Text
 from river_common import Status
 
@@ -9,13 +8,11 @@ BRIGHT_DOT = '\u2022'  # •
 DIM_DOT = '\u00B7'     # ·
 STATIC_DOT = '.'       # Static dots for non-running states
 
-INDENT_LENGTH = 4
-
 # Visual configuration
 ICONS = {
-    'river': '◎',  # Greater than symbol
+    'river': '>',  # Greater than symbol
     'job': '+',    # Plus sign
-    'task': '>'    # Minus sign
+    'task': '-'    # Minus sign
 }
 
 COLORS = {
@@ -32,7 +29,7 @@ class AnimatedLabel:
     def __init__(self, item_type: str, name: str, status: Status, indent_level: int = 0):
         self.item_type = item_type
         self.name = name
-        self.status = status
+        self._status = status
         self.running_start: int | None = None
         self.running_end: int | None = None
         self.indent_level = indent_level
@@ -41,23 +38,20 @@ class AnimatedLabel:
         # Calculate dots needed based on available width
         self.dots_needed = self._calculate_dots_needed()
     
-    def _calculate_dots_needed(self, tree_prefix: str = "") -> int:
+    def _calculate_dots_needed(self) -> int:
         """Calculate how many dots are needed based on available terminal width"""
-        # Use a fixed target width for all items to ensure alignment
-        target_width = 80  # Fixed width for consistent alignment
+        base_width = 80  # Assume 80 char terminal
+        tree_indent_width = self.indent_level * 4  # Approximate tree indentation
+        available_width = base_width - tree_indent_width
         
-        # Calculate the length of all non-dot elements
-        prefix_length = len(tree_prefix)
-        name_part = f"{self.icon} {self.name} "  # Include the space after name
+        name_part = f"{self.icon} {self.name}"
         
-        # Use fixed maximum length for status and time part to ensure consistent alignment
+        # Use fixed width for status to ensure consistent alignment
         max_status_length = max(len(s.value) for s in Status)
-        max_time_length = 8  # Reserve space for "1h 30m 5s" format
-        status_time_part = f" {' ' * max_status_length} {' ' * max_time_length}"  # Fixed width
+        status_padded = f"{self._status.value:<{max_status_length}}"
+        status_time_part = f"({status_padded}) {self.time_display}"
         
-        # Calculate dots needed to reach target width
-        used_width = prefix_length + len(name_part) + len(status_time_part) + self.indent_level * INDENT_LENGTH
-        dots_needed = target_width - used_width
+        dots_needed = available_width - len(name_part) - len(status_time_part)
         
         return max(1, dots_needed)  # Ensure at least 1 dot
     
@@ -70,6 +64,16 @@ class AnimatedLabel:
     def get_icon(item_type: str) -> str:
         """Get symbol for item type"""
         return ICONS.get(item_type, '?')
+    
+    @property
+    def icon(self) -> str:
+        """Get the icon based on item type"""
+        return self.get_icon(self.item_type)
+    
+    @property
+    def color(self) -> str:
+        """Get the color based on current status"""
+        return self.get_status_color(self._status)
     
     @property
     def time_display(self) -> str:
@@ -103,25 +107,14 @@ class AnimatedLabel:
             parts.append(f"{seconds}s")
         
         time_str = " ".join(parts)
-        
-        # Pad to consistent width (8 characters should handle most cases)
         return time_str
     
-    @property
-    def icon(self) -> str:
-        """Get the icon based on item type"""
-        return self.get_icon(self.item_type)
-    
-    @property
-    def color(self) -> str:
-        """Get the color based on current status"""
-        return self.get_status_color(self.status)
     
     @property
     def status_time_part(self) -> str:
         """Get formatted status and time part"""
         max_status_length = max(len(s.value) for s in Status)
-        status_padded = f"{self.status.value:<{max_status_length}}"
+        status_padded = f"{self._status.value:<{max_status_length}}"
         return f"{status_padded} {self.time_display}"
     
     def update_status(self, status: Status):
@@ -129,17 +122,14 @@ class AnimatedLabel:
         current_time = int(time.time() * 1000)
         if status == Status.RUNNING:
             self.running_start = current_time
-        elif self.status == Status.RUNNING:
+        elif self._status == Status.RUNNING:
             self.running_end = current_time
-        self.status = status
+        self._status = status
     
-    def _create_animated_dots(self, dots_count: int | None = None) -> str:
+    def _create_animated_dots(self) -> str:
         """Create animated dots that sweep from left to right."""
-        if dots_count is None:
-            dots_count = self.dots_needed
-            
-        if self.status != Status.RUNNING or dots_count <= 1:
-            return STATIC_DOT * dots_count
+        if self._status != Status.RUNNING or self.dots_needed <= 1:
+            return STATIC_DOT * self.dots_needed
         
         # Initialize animation start time on first render
         current_time = time.time()
@@ -153,14 +143,14 @@ class AnimatedLabel:
         cycle_position = (elapsed % ANIMATION_CYCLE_DURATION) / ANIMATION_CYCLE_DURATION
         
         # Calculate the bright section
-        bright_width = min(6, max(1, dots_count // 3))
-        # Allow bright section to completely sweep across (from 0 to beyond dots_count)
-        total_sweep_distance = dots_count + bright_width
+        bright_width = min(6, max(1, self.dots_needed // 3))
+        # Allow bright section to completely sweep across (from 0 to beyond dots_needed)
+        total_sweep_distance = self.dots_needed + bright_width
         bright_start = int(cycle_position * total_sweep_distance) - bright_width // 2
         
         # Build the animated dot string
         dots = []
-        for i in range(dots_count):
+        for i in range(self.dots_needed):
             if bright_start <= i < bright_start + bright_width:
                 dots.append(BRIGHT_DOT)
             else:
@@ -168,39 +158,29 @@ class AnimatedLabel:
         
         return ''.join(dots)
     
-    def get_text(self, tree_prefix: str = "") -> Text:
-        """Get the formatted text for this label."""
+    def __rich__(self) -> Text:
+        """Rich protocol method - called automatically when Rich needs to render this object."""
         text = Text()
         
-        if tree_prefix:
-            text.append(tree_prefix, style=TREE_GUIDE_STYLE)
-        
-        # Create the label content with color styling
-        label_content = Text()
-        
         # Add icon and name
-        name_part = f"{self.icon} {self.name} "
-        label_content.append(name_part)
+        name_part = f"{self.icon} {self.name}"
+        text.append(name_part)
         
-        # Recalculate dots needed with tree prefix
-        dots_needed = self._calculate_dots_needed(tree_prefix)
-        
-        # Add animated or static dots with updated count
-        dots = self._create_animated_dots(dots_needed)
-        label_content.append(dots)
+        # Add animated or static dots
+        dots = self._create_animated_dots()
+        text.append(dots)
         
         # Add status and time with consistent padding
-        status_part = f" {self.status_time_part}"
-        label_content.append(status_part)
+        max_status_length = max(len(s.value) for s in Status)
+        status_padded = f"{self._status.value:<{max_status_length}}"
+        status_part = f"({status_padded}) {self.time_display}"
+        text.append(status_part)
         
-        # Apply color only to the label content, not the tree prefix
-        label_content.stylize(self.color)
-        
-        # Append the styled label content to the main text
-        text.append(label_content)
+        # Apply color to the entire text
+        text.stylize(self.color)
         
         return text
     
     def __str__(self) -> str:
         """String representation for debugging."""
-        return f"AnimatedLabel({self.name}, {self.status.value})"
+        return f"AnimatedLabel({self.name}, {self._status.value})"
