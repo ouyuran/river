@@ -4,10 +4,7 @@ import threading
 import queue
 from typing import Dict, Optional
 from rich.live import Live
-from rich.tree import Tree
 from rich.console import Console
-from river_common import Status
-from animated_label import AnimatedLabel
 from river_node import RiverNode
 
 TARGET_FPS = 60  # Target frames per second for animations

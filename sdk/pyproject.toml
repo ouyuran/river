@@ -10,6 +10,7 @@ readme = "./README.md"
 
 dependencies = [
     "fabric==3.2.2",
+    "river-common",
 ]
 
 [project.optional-dependencies]
@@ -17,6 +18,9 @@ test = [
     "pytest>=7.0",
     "pytest-cov",
 ]
+
+[tool.uv.sources]
+river-common = { path = "../common", editable = true }
 
 [build-system]
 requires = ["setuptools>=61.0"]
