@@ -6,6 +6,7 @@ from typing import Dict, Optional
 from rich.live import Live
 from rich.console import Console
 from river_node import RiverNode
+from river_common.status import StatusBase
 
 TARGET_FPS = 60  # Target frames per second for animations
 
@@ -16,9 +17,9 @@ class StreamingTreeRenderer:
         self.data_queue = queue.Queue()
         self.running = True
     
-    def update_or_create_node(self, item):
+    def update_or_create_node(self, item: StatusBase):
         """Update existing node or create new one"""
-        item_id = item['id']
+        item_id = item.id
         
         if item_id in self.nodes:
             # Update existing RiverNode
@@ -27,7 +28,7 @@ class StreamingTreeRenderer:
             return existing_node
         
         # Create new RiverNode
-        parent_id = item.get('parent_id')
+        parent_id = item.parent_id
         parent_node = self.nodes.get(parent_id) if parent_id else None
         
         river_node = RiverNode(item=item, parent=parent_node)
@@ -35,11 +36,18 @@ class StreamingTreeRenderer:
         
         return river_node
     
-    def process_item(self, item):
+    def process_item(self, item_data):
         """Process a single item from the queue"""
-        river_node = self.update_or_create_node(item)
-        self.data_queue.task_done()
-        return river_node
+        try:
+            # Convert JSON data to StatusBase object
+            item = StatusBase(**item_data)
+            river_node = self.update_or_create_node(item)
+            self.data_queue.task_done()
+            return river_node
+        except (TypeError, ValueError) as e:
+            # Skip invalid data and mark task as done
+            self.data_queue.task_done()
+            return None
     
     def wait_and_process_first_item(self):
         """Wait for and process the first item from queue"""
@@ -61,7 +69,8 @@ class StreamingTreeRenderer:
     
     def render_error_summary(self):
         """Render summary of all failed items with error details"""
-        failed_nodes = [node for node in self.nodes.values() if node.item.get('status') == 'failed']
+        from river_common.shared import Status
+        failed_nodes = [node for node in self.nodes.values() if node.item.status == Status.FAILED]
         
         if not failed_nodes:
             return
@@ -72,15 +81,12 @@ class StreamingTreeRenderer:
         
         for node in failed_nodes:
             item = node.item
-            self.console.print(f"[bold red]• {item['name']}[/bold red] (ID: {item['id']})")
+            self.console.print(f"[bold red]• {item.name}[/bold red] (ID: {item.id})")
             
-            error_msg = item.get('error')
-            error_type = item.get('error_type')
-            
-            if error_msg:
-                self.console.print(f"  [red]Error:[/red] {error_msg}")
-                if error_type:
-                    self.console.print(f"  [red]Type:[/red] {error_type}")
+            if item.error:
+                self.console.print(f"  [red]Error:[/red] {item.error}")
+                if item.error_type:
+                    self.console.print(f"  [red]Type:[/red] {item.error_type}")
             else:
                 self.console.print(f"  [red]Error:[/red] Failed without details")
             

@@ -1,6 +1,6 @@
 from river_common import JobStatus, RiverStatus, Status, TaskStatus
 from time import sleep
-
+print("Invalid data")
 r = RiverStatus(
     id='000',
     name='river'
@@ -24,7 +24,7 @@ j2.export()
 sleep(1)
 r.set_status(Status.RUNNING)
 r.export()
-
+print("Invalid data")
 j1.set_status(Status.RUNNING)
 j1.export()
 # job1

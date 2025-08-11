@@ -1,6 +1,8 @@
 import time
+from datetime import datetime, timezone
 from rich.text import Text
 from river_common import Status
+from river_common.status import StatusBase
 
 # Configuration for animations
 ANIMATION_CYCLE_DURATION = 2.0  # seconds for full sweep
@@ -26,21 +28,24 @@ COLORS = {
 class AnimatedLabel:
     """A Rich-compatible animated label that sweeps dots from left to right for running status."""
     
-    def __init__(self, item_type: str, name: str, status: Status, indent_level: int = 0):
-        self.item_type = item_type
-        self.name = name
-        self._status = status
-        self.running_start: int | None = None
-        self.running_end: int | None = None
+    def __init__(self, item: StatusBase, indent_level: int = 0):
+        self.item_type = item.type
+        self.name = item.name
+        self._status = item.status
+        self.running_start: datetime | None = None
+        self.running_end: datetime | None = None
         self.indent_level = indent_level
         self._animation_start_time = None  # Will be set on first render
+        
+        if self._status == Status.RUNNING:
+            self.running_start = item.updated_at
         
         # Calculate dots needed based on available width
         self.dots_needed = self._calculate_dots_needed()
     
     def _calculate_dots_needed(self) -> int:
         """Calculate how many dots are needed based on available terminal width"""
-        base_width = 80  # Assume 80 char terminal
+        base_width = 90  # Assume 80 char terminal
         tree_indent_width = self.indent_level * 4  # Approximate tree indentation
         available_width = base_width - tree_indent_width
         
@@ -48,8 +53,10 @@ class AnimatedLabel:
         
         # Use fixed width for status to ensure consistent alignment
         max_status_length = max(len(s.value) for s in Status)
+        max_time_display_length = len("xxh xxm xxs")
         status_padded = f"{self._status.value:<{max_status_length}}"
-        status_time_part = f"({status_padded}) {self.time_display}"
+        time_display_padded = f"{self._status.value:<{max_time_display_length}}"
+        status_time_part = f"({status_padded}) {time_display_padded}"
         
         dots_needed = available_width - len(name_part) - len(status_time_part)
         
@@ -68,7 +75,7 @@ class AnimatedLabel:
     @property
     def icon(self) -> str:
         """Get the icon based on item type"""
-        return self.get_icon(self.item_type)
+        return self.get_icon(self.item_type.value)
     
     @property
     def color(self) -> str:
@@ -81,21 +88,19 @@ class AnimatedLabel:
         if self.running_start is None:
             return ""
         
-        current_time = int(time.time() * 1000)
-        
         if self.running_end is None:
             # Still running - show time since start
-            elapsed_ms = current_time - self.running_start
+            elapsed = datetime.now(timezone.utc) - self.running_start
         else:
             # Finished - show total runtime
-            elapsed_ms = self.running_end - self.running_start
+            elapsed = self.running_end - self.running_start
         
         # Convert to seconds and format as xxh xxm xxs
-        total_seconds = int(elapsed_ms / 1000)
+        total_seconds = int(elapsed.total_seconds())
         
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        seconds = total_seconds % 60
+        # Use divmod for cleaner time calculation
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
         
         # Build format string, skipping zero sections
         parts = []
@@ -106,8 +111,7 @@ class AnimatedLabel:
         if seconds > 0 or not parts:  # Always show seconds if nothing else
             parts.append(f"{seconds}s")
         
-        time_str = " ".join(parts)
-        return time_str
+        return " ".join(parts)
     
     
     @property
@@ -117,14 +121,14 @@ class AnimatedLabel:
         status_padded = f"{self._status.value:<{max_status_length}}"
         return f"{status_padded} {self.time_display}"
     
-    def update_status(self, status: Status):
-        """Update the status"""
-        current_time = int(time.time() * 1000)
-        if status == Status.RUNNING:
-            self.running_start = current_time
+    def update_from_item(self, item: StatusBase):
+        """Update from StatusBase object"""
+        if item.status == Status.RUNNING:
+            self.running_start = item.updated_at
         elif self._status == Status.RUNNING:
-            self.running_end = current_time
-        self._status = status
+            self.running_end = item.updated_at
+
+        self._status = item.status
     
     def _create_animated_dots(self) -> str:
         """Create animated dots that sweep from left to right."""
