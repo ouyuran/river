@@ -5,7 +5,7 @@ import queue
 from typing import Dict, Optional
 from rich.live import Live
 from rich.console import Console
-from river_node import RiverNode
+from .river_node import RiverNode
 from river_common.status import StatusBase
 
 TARGET_FPS = 60  # Target frames per second for animations
@@ -115,7 +115,7 @@ class StreamingTreeRenderer:
         """Start the data.py subprocess"""
         try:
             proc = subprocess.Popen(
-                ["uv", "run", "python", "src/data.py"],
+                ["uv", "run", "__main__.py"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,

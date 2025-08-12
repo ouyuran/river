@@ -1,0 +1,19 @@
+[project]
+name = "river-demo"
+version = "0.1.0"
+description = "Demo for river project."
+authors = [
+    { name = "Yuran Ou", email = "hello@ouyuran.com" }
+]
+requires-python = ">=3.12"
+readme = "./README.md"
+
+dependencies = [
+    "river-cli",
+    "river-sdk",
+]
+
+[tool.uv.sources]
+river-cli = { path = "../cli", editable = true }
+river-sdk = { path = "../sdk", editable = true }
+ 

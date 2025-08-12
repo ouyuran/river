@@ -4,7 +4,7 @@ from functools import partial
 from invoke.runners import Result
 
 if TYPE_CHECKING:
-    from sdk.src.job import Job
+    from river_sdk.job import Job
 
 T = TypeVar('T', bound='BaseSandbox')
 

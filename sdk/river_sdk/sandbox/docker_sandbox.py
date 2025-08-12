@@ -4,12 +4,12 @@ import shlex
 from fabric import Connection
 from functools import partial
 from typing import Callable, Optional, TYPE_CHECKING
-from sdk.src.sandbox.command_executor import CommandExecutor, LocalCommandExecutor, RemoteCommandExecutor
+from river_sdk.sandbox.command_executor import CommandExecutor, LocalCommandExecutor, RemoteCommandExecutor
 from invoke.runners import Result
-from sdk.src.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
+from river_sdk.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
 
 if TYPE_CHECKING:
-    from sdk.src.job import Job
+    from river_sdk.job import Job
 
 
 class DockerSandbox(BaseSandbox):

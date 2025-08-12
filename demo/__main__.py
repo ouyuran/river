@@ -1,7 +1,4 @@
-from sdk.src.job import Job
-from sdk.src.river import River, default_sandbox_creator, sandbox_forker
-from sdk.src.task import bash
-from sdk.src.sandbox.docker_sandbox import DockerSandboxManager
+from river_sdk import Job, River, bash, DockerSandboxManager, default_sandbox_creator, sandbox_forker
 
 
 class CreateHelloFileJob(Job):

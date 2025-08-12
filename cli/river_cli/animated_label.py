@@ -95,11 +95,18 @@ class AnimatedLabel:
             # Finished - show total runtime
             elapsed = self.running_end - self.running_start
         
-        # Convert to seconds and format as xxh xxm xxs
-        total_seconds = int(elapsed.total_seconds())
+        # Get total seconds as float for sub-second precision
+        total_seconds = elapsed.total_seconds()
+        
+        # If less than 1 second, show with two decimal places
+        if total_seconds < 1.0:
+            return f"{total_seconds:.2f}s"
+        
+        # For 1+ seconds, use integer seconds and format as xxh xxm xxs
+        total_seconds_int = int(total_seconds)
         
         # Use divmod for cleaner time calculation
-        hours, remainder = divmod(total_seconds, 3600)
+        hours, remainder = divmod(total_seconds_int, 3600)
         minutes, seconds = divmod(remainder, 60)
         
         # Build format string, skipping zero sections

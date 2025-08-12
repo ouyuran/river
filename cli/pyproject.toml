@@ -19,9 +19,16 @@ test = [
     "pytest-cov",
 ]
 
+[project.scripts]
+river = "river_cli.main:main"
+
 [tool.uv.sources]
 river-common = { path = "../common", editable = true }
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["river_cli*"]
+
 [build-system]
 requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta" 
+build-backend = "setuptools.build_meta"

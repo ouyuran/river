@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 from contextvars import ContextVar
-from enum import Enum
 from typing import Callable, Any, Optional
-from sdk.src.sandbox.base_sandbox import BaseSandbox
+import uuid
+from river_sdk.sandbox.base_sandbox import BaseSandbox
+from river_common.status import JobStatus
+from river_common.shared import Status
 
 
 class JobContext():
@@ -15,7 +17,7 @@ class JobContext():
         self._token = JobContext.context.set(self._job)
         return self
     
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, _exc_type, _exc_val, _exc_tb):
         JobContext.context.reset(self._token)
 
     @staticmethod
@@ -24,12 +26,6 @@ class JobContext():
 
 
 class Job(ABC):
-    class Status(Enum):
-        PENDING = "pending"
-        RUNNING = "running"
-        SUCCESS = "success"
-        FAILED = "failed"
-        SKIPPED = "skipped"
 
     def __init__(
         self,
@@ -37,15 +33,38 @@ class Job(ABC):
         sandbox_creator: Optional[Callable[[], BaseSandbox]] = None,
         upstreams: Optional[list['Job']] = None,
     ):
+        self.id = str(uuid.uuid4())
         self.name = name
         self.result = None
         self._upstreams: list[Job] = []
-        self.status = Job.Status.PENDING
+        self.status = Status.PENDING
         self.sandbox: Any = None  # Use Any to avoid forcing users to specify generic types
         self._sandbox_creator = sandbox_creator
         self.error: Optional[Exception] = None
+        # TODO, here we are not in River context
+        # self.set_status(Status.PENDING) 
+            
         if upstreams:
             self._join(upstreams)
+
+    def set_status(self, status: Status, exception: Optional[Exception] = None):
+        """Set the job status and export"""
+        self.status = status
+        
+        # Import here to avoid circular dependency
+        from river_sdk.river import get_current_river
+        
+        job_status = JobStatus(
+            id=self.id,
+            name=self.name,
+            parent_id=get_current_river().id,
+            status=status
+        )
+        
+        if status == Status.FAILED and exception:
+            job_status.set_failed(exception)
+        
+        job_status.export()
 
     @abstractmethod
     def main(self) -> Any:
@@ -53,9 +72,9 @@ class Job(ABC):
         pass
 
     def run(self):
-        from sdk.src.river import get_current_sandbox_manager
+        from river_sdk.river import get_current_sandbox_manager
         # TODO: this could be a problem for async jobs
-        if self.status == Job.Status.RUNNING:
+        if self.status == Status.RUNNING:
             raise RuntimeError(f"Job '{self.name}' is already running.")
         
         if not self._run_already_finished() and not self._should_skip_due_to_upstream():
@@ -67,9 +86,9 @@ class Job(ABC):
                 if self.sandbox:
                     get_current_sandbox_manager().take_snapshot(self.sandbox)
             except Exception as e:
-                self.status = Job.Status.FAILED
                 self.result = None
                 self.error = e
+                self.set_status(Status.FAILED, e)
             finally:
                 if self.sandbox:
                     get_current_sandbox_manager().destory(self.sandbox)
@@ -103,22 +122,23 @@ class Job(ABC):
         return None
 
     def _run_already_finished(self):
-        return self.status in (Job.Status.SUCCESS, Job.Status.FAILED, Job.Status.SKIPPED)
+        return self.status in (Status.SUCCESS, Status.FAILED, Status.SKIPPED)
 
     def _should_skip_due_to_upstream(self):
         for job in self._upstreams:
             job.run()
-            if job.status in (Job.Status.FAILED, Job.Status.SKIPPED):
-                self.status = Job.Status.SKIPPED
+            if job.status in (Status.FAILED, Status.SKIPPED):
                 self.result = None
+                self.set_status(Status.SKIPPED)
                 return True
         return False
 
     def _execute_main(self):
-        self.status = Job.Status.RUNNING
+        self.set_status(Status.RUNNING)
         result = self.main()
-        self.status = Job.Status.SUCCESS
         self.result = result
+        self.set_status(Status.SUCCESS)
+
 
 class JobContextError(Exception):
     """Raised when job context operations are called outside of a job context."""

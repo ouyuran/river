@@ -1,6 +1,6 @@
 from typing import Optional, Dict
 from rich.tree import Tree
-from animated_label import AnimatedLabel
+from .animated_label import AnimatedLabel
 from river_common.status import StatusBase
 
 TREE_GUIDE_STYLE = "dim white"
