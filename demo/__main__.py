@@ -30,6 +30,7 @@ def main():
 
     job1 = CreateHelloFileJob(
         "create_hello_file",
+        # TODO, if none should use default
         sandbox_creator=default_sandbox_creator(),
     )
     job2 = CatHelloFileJob(
@@ -47,7 +48,7 @@ def main():
         }
     )
 
-    river.flow()
+    river.flow("only_create")
 
 if __name__ == "__main__":
     main()
