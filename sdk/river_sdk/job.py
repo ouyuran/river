@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from typing import Callable, Any, Optional
+import cloudpickle
+import hashlib
+import sys
 import uuid
 from river_sdk.sandbox.base_sandbox import BaseSandbox
 from river_common.status import JobStatus
@@ -47,6 +50,29 @@ class Job(ABC):
         if upstreams:
             self._join(upstreams)
 
+    @property
+    def fingerprint(self) -> str:
+        """Get hash value for cache mechanism."""
+        from river_sdk.river import get_current_river
+        # return hashlib.sha1(b''.join([
+        #     sys.version.encode(),
+        #     cloudpickle.dumps(get_current_river()),
+        #     cloudpickle.dumps(self),
+        # ])).hexdigest()
+        sys_version = sys.version.encode()
+        river_context = cloudpickle.dumps(get_current_river())
+        job_context = cloudpickle.dumps(self)
+        print(sys_version)
+        print(river_context)
+        print(job_context)
+        hash_value = hashlib.sha1(b''.join([
+            sys_version,
+            river_context,
+            job_context
+        ])).hexdigest()
+        print(hash_value)
+        return hash_value
+
     def set_status(self, status: Status, exception: Optional[Exception] = None):
         """Set the job status and export"""
         self.status = status
@@ -77,6 +103,17 @@ class Job(ABC):
         if self.status == Status.RUNNING:
             raise RuntimeError(f"Job '{self.name}' is already running.")
         
+        current_sandbox_manager = get_current_sandbox_manager()
+        fingerprint = self.fingerprint
+
+        if current_sandbox_manager.snapshot_exists(fingerprint):
+            print("😄")
+            cached_job_status = current_sandbox_manager.get_job_status_from_snapshot(fingerprint)
+            cached_job_status.export()
+            return
+            # TODO
+            # return cached_job_status.status, cached_job_status.result, cached_job_status.error
+        
         if not self._run_already_finished() and not self._should_skip_due_to_upstream():
             try:
                 if self._sandbox_creator:
@@ -84,16 +121,15 @@ class Job(ABC):
                 with JobContext(self):
                     self._execute_main()
                 if self.sandbox:
-                    get_current_sandbox_manager().take_snapshot(self.sandbox)
+                    current_sandbox_manager.take_snapshot(self.sandbox, fingerprint)
             except Exception as e:
                 self.result = None
                 self.error = e
                 self.set_status(Status.FAILED, e)
             finally:
                 if self.sandbox:
-                    get_current_sandbox_manager().destory(self.sandbox)
+                    current_sandbox_manager.destory(self.sandbox)
 
-        print(self.name, self.status, self.result, self.error)
         return self.status, self.result, self.error
 
     def _join(self, upstreams: list['Job']):

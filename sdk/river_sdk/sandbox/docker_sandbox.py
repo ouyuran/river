@@ -7,9 +7,13 @@ from typing import Callable, Optional, TYPE_CHECKING
 from river_sdk.sandbox.command_executor import CommandExecutor, LocalCommandExecutor, RemoteCommandExecutor
 from invoke.runners import Result
 from river_sdk.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
+from river_common.status import JobStatus
 
 if TYPE_CHECKING:
     from river_sdk.job import Job
+
+RIVER_ROOT = "/river"
+JOB_STATUS_FILE = f"{RIVER_ROOT}/job_status"
 
 
 class DockerSandbox(BaseSandbox):
@@ -78,6 +82,7 @@ class DockerSandboxManager(BaseSandboxManager):
         """
         result = self._executor.run(f"docker run -d {image} tail -f /dev/null")
         container_id = result.stdout.strip()
+        self._executor.run(f"docker exec {container_id} mkdir -p {RIVER_ROOT}")
         return DockerSandbox(
             id=container_id,
             # Create new executor instance to isolate manager and sandbox
@@ -100,12 +105,41 @@ class DockerSandboxManager(BaseSandboxManager):
         self._executor.run(f"docker stop -t 0 {sandbox.id}")
         self._executor.run(f"docker rm {sandbox.id}")
 
-    def take_snapshot(self, sandbox: DockerSandbox) -> str:
+    def _get_tag(self, fingerprint:str) -> str:
+        return f"river-sandbox:{fingerprint}"
+
+    def take_snapshot(self, sandbox: DockerSandbox, fingerprint: str) -> str:
         """Commit the Docker container and return image tag."""
-        tag = f"river-sandbox:{str(uuid.uuid4()).replace('-', '')}"
+        tag = self._get_tag(fingerprint)
         result = self._executor.run(f"docker commit {sandbox.id} {tag}")
         if not result.ok:
             msg = f"Task snapshot for docker sandbox failed, {result.stderr}"
             raise RuntimeError(msg)
         sandbox.snapshot = tag
         return tag
+    
+    def snapshot_exists(self, fingerprint: str) -> bool:
+        tag = self._get_tag(fingerprint)
+        result = self._executor.run(" ".join([
+            "docker images --format",
+            "'{{.Repository}}:{{.Tag}}'",
+            "|",
+            "grep -w '",
+            tag,
+            "'",
+        ]))
+        return result.ok
+    
+    def set_job_status_to_sandbox(self, sandbox: DockerSandbox, status: JobStatus) -> None:
+        status_json = status.model_dump_json()
+        self._executor.run(f"docker exec {sandbox.id} echo {status_json} > {JOB_STATUS_FILE}")
+        pass
+    
+    def get_job_status_from_snapshot(self, fingerprint: str) -> JobStatus:
+        tag = self._get_tag(fingerprint)
+        result = self._executor.run(f"docker run {tag} cat {JOB_STATUS_FILE}")
+        if result.ok:
+            return JobStatus.model_validate_json(result.stdout)
+        else:
+            msg = f"Cannot get cached job status from {fingerprint=}, {result.stderr}"
+            raise RuntimeError(msg)

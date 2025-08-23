@@ -1,4 +1,7 @@
-from river_sdk import Job, River, bash, DockerSandboxManager, default_sandbox_creator, sandbox_forker
+from river_sdk import fingerprint, Job, River, bash, DockerSandboxManager, default_sandbox_creator, sandbox_forker
+import cloudpickle
+from python_utils import to_int
+
 
 
 class CreateHelloFileJob(Job):
@@ -6,9 +9,13 @@ class CreateHelloFileJob(Job):
         super().__init__(name, sandbox_creator=sandbox_creator)
 
     def main(self):
+        a = to_int("123")
         bash("echo 'Hello, river!' > hello_river.txt")
         bash("mkdir /test")
         bash("touch /test/aaa")
+
+    def dumps(self):
+        return cloudpickle.dumps(self)
 
 class CatHelloFileJob(Job):
     def __init__(self, name: str, create_job: CreateHelloFileJob):
@@ -27,28 +34,29 @@ class CatHelloFileJob(Job):
         print(result)
 
 def main():
-
     job1 = CreateHelloFileJob(
-        "create_hello_file",
+        "create_hello_file1",
         # TODO, if none should use default
         sandbox_creator=default_sandbox_creator(),
     )
-    job2 = CatHelloFileJob(
-        "cat_hello_file",
-        create_job=job1,
-    )
+    f = fingerprint(CreateHelloFileJob)
+    print(f)
+    # job2 = CatHelloFileJob(
+    #     "cat_hello_file",
+    #     create_job=job1,
+    # )
 
-    river = River(
-        "hello_reiver",
-        sandbox_manager=DockerSandboxManager(),
-        default_sandbox_config="ubuntu",
-        outlets={
-            "default": job2,
-            "only_create": job1
-        }
-    )
+    # river = River(
+    #     "hello_reiver",
+    #     sandbox_manager=DockerSandboxManager(),
+    #     default_sandbox_config="ubuntu",
+    #     outlets={
+    #         "default": job2,
+    #         "only_create": job1
+    #     }
+    # )
 
-    river.flow("only_create")
+    # river.flow()
 
 if __name__ == "__main__":
     main()

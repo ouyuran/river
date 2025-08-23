@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional, TypeVar, TYPE_CHECKING
 from functools import partial
 from invoke.runners import Result
+from river_common.status import JobStatus
 
 if TYPE_CHECKING:
     from river_sdk.job import Job
@@ -73,7 +74,21 @@ class BaseSandboxManager(ABC):
         pass
 
     @abstractmethod
-    def take_snapshot(self, sandbox: BaseSandbox) -> str:
+    def take_snapshot(self, sandbox: BaseSandbox, fingerprint: str) -> str:
         """Task snapshot of current sandbox and return the id of snapshot."""
         pass
+
+    @abstractmethod
+    def snapshot_exists(self, fingerprint: str) -> bool:
+        """Check whether snapshot with given fingerprint exists."""
+        pass
     
+    @abstractmethod
+    def set_job_status_to_sandbox(self, status: JobStatus) -> None:
+        """Set job status to a sandbox instance."""
+        pass
+
+    @abstractmethod
+    def get_job_status_from_snapshot(self, fingerprint: str) -> JobStatus:
+        """Get job status from a snapshot with given fingerprint."""
+        pass
