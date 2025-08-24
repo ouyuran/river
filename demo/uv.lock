@@ -160,6 +160,15 @@ wheels = [
 ]
 
 [[package]]
+name = "dill"
+version = "0.4.0"
+source = { registry = "https://mirrors.nju.edu.cn/pypi/web/simple" }
+sdist = { url = "https://mirrors.nju.edu.cn/pypi/web/packages/12/80/630b4b88364e9a8c8c5797f4602d0f76ef820909ee32f0bacb9f90654042/dill-0.4.0.tar.gz", hash = "sha256:0633f1d2df477324f53a895b02c901fb961bdbf65a17122586ea7019292cbcf0" }
+wheels = [
+    { url = "https://mirrors.nju.edu.cn/pypi/web/packages/50/3d/9373ad9c56321fdab5b41197068e1d8c25883b3fea29dd361f9b55116869/dill-0.4.0-py3-none-any.whl", hash = "sha256:44f54bf6412c2c8464c14e8243eb163690a9800dbe2c367330883b19c7561049" },
+]
+
+[[package]]
 name = "fabric"
 version = "3.2.2"
 source = { registry = "https://mirrors.nju.edu.cn/pypi/web/simple" }
@@ -181,6 +190,15 @@ source = { registry = "https://mirrors.nju.edu.cn/pypi/web/simple" }
 sdist = { url = "https://mirrors.nju.edu.cn/pypi/web/packages/f9/42/127e6d792884ab860defc3f4d80a8f9812e48ace584ffc5a346de58cdc6c/invoke-2.2.0.tar.gz", hash = "sha256:ee6cbb101af1a859c7fe84f2a264c059020b0cb7fe3535f9424300ab568f6bd5" }
 wheels = [
     { url = "https://mirrors.nju.edu.cn/pypi/web/packages/0a/66/7f8c48009c72d73bc6bbe6eb87ac838d6a526146f7dab14af671121eb379/invoke-2.2.0-py3-none-any.whl", hash = "sha256:6ea924cc53d4f78e3d98bc436b08069a03077e6f85ad1ddaa8a116d7dad15820" },
+]
+
+[[package]]
+name = "joblib"
+version = "1.5.1"
+source = { registry = "https://mirrors.nju.edu.cn/pypi/web/simple" }
+sdist = { url = "https://mirrors.nju.edu.cn/pypi/web/packages/dc/fe/0f5a938c54105553436dbff7a61dc4fed4b1b2c98852f8833beaf4d5968f/joblib-1.5.1.tar.gz", hash = "sha256:f4f86e351f39fe3d0d32a9f2c3d8af1ee4cec285aafcb27003dda5205576b444" }
+wheels = [
+    { url = "https://mirrors.nju.edu.cn/pypi/web/packages/7d/4f/1195bbac8e0c2acc5f740661631d8d750dc38d4a32b23ee5df3cde6f4e0d/joblib-1.5.1-py3-none-any.whl", hash = "sha256:4719a31f054c7d766948dcd83e9613686b27114f190f717cec7eaa2084f8a74a" },
 ]
 
 [[package]]
@@ -316,14 +334,14 @@ wheels = [
 
 [[package]]
 name = "python-utils"
-version = "3.9.1"
+version = "3.9.0"
 source = { registry = "https://mirrors.nju.edu.cn/pypi/web/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://mirrors.nju.edu.cn/pypi/web/packages/13/4c/ef8b7b1046d65c1f18ca31e5235c7d6627ca2b3f389ab1d44a74d22f5cc9/python_utils-3.9.1.tar.gz", hash = "sha256:eb574b4292415eb230f094cbf50ab5ef36e3579b8f09e9f2ba74af70891449a0" }
+sdist = { url = "https://mirrors.nju.edu.cn/pypi/web/packages/33/99/fd1e3f80357dd88378281013ae7040a443de395bb0855bf17cbb828488d1/python_utils-3.9.0.tar.gz", hash = "sha256:3689556884e3ae53aec5a4c9f17b36e752a3e93a7ba2768c6553fc4dd6fa70ef" }
 wheels = [
-    { url = "https://mirrors.nju.edu.cn/pypi/web/packages/d4/69/31c82567719b34d8f6b41077732589104883771d182a9f4ff3e71430999a/python_utils-3.9.1-py2.py3-none-any.whl", hash = "sha256:0273d7363c7ad4b70999b2791d5ba6b55333d6f7a4e4c8b6b39fb82b5fab4613" },
+    { url = "https://mirrors.nju.edu.cn/pypi/web/packages/17/e7/200045de1f41ad74915a334f7c2aac54d2d6f4b89643a53e1062cde4895b/python_utils-3.9.0-py2.py3-none-any.whl", hash = "sha256:a7719a5ef4bae7360d2a15c13b08c4e3c3e39b9df19bd16f119ff8d0cfeaafb7" },
 ]
 
 [[package]]
@@ -379,6 +397,8 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "cloudpickle" },
+    { name = "dill" },
+    { name = "joblib" },
     { name = "python-utils" },
     { name = "river-cli" },
     { name = "river-sdk" },
@@ -387,7 +407,9 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "cloudpickle", specifier = ">=3.1.1" },
-    { name = "python-utils", specifier = "==3.9.1" },
+    { name = "dill" },
+    { name = "joblib" },
+    { name = "python-utils", specifier = "==3.9.0" },
     { name = "river-cli", editable = "../cli" },
     { name = "river-sdk", editable = "../sdk" },
 ]

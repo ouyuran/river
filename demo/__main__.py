@@ -1,15 +1,18 @@
 from river_sdk import fingerprint, Job, River, bash, DockerSandboxManager, default_sandbox_creator, sandbox_forker
 import cloudpickle
 from python_utils import to_int
+import joblib
+import dill
+import hashlib
 
-
+NUM = 2
 
 class CreateHelloFileJob(Job):
     def __init__(self, name: str, sandbox_creator=None):
         super().__init__(name, sandbox_creator=sandbox_creator)
 
     def main(self):
-        a = to_int("123")
+        a = to_int(f"{NUM}")
         bash("echo 'Hello, river!' > hello_river.txt")
         bash("mkdir /test")
         bash("touch /test/aaa")
@@ -39,12 +42,16 @@ def main():
         # TODO, if none should use default
         sandbox_creator=default_sandbox_creator(),
     )
-    f = fingerprint(CreateHelloFileJob)
-    print(f)
+    print(f"fingerprint: {fingerprint(job1)}")
+    # print(f"joblib:      {joblib.hash(job1)}")
+    print(f"dill:        {hashlib.sha1(dill.dumps(job1)).hexdigest()}")
+
     # job2 = CatHelloFileJob(
     #     "cat_hello_file",
     #     create_job=job1,
     # )
+    # fingerprint(CatHelloFileJob)
+    # fingerprint(job2)
 
     # river = River(
     #     "hello_reiver",
@@ -55,6 +62,7 @@ def main():
     #         "only_create": job1
     #     }
     # )
+    
 
     # river.flow()
 

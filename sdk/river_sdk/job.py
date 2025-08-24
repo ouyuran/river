@@ -36,7 +36,8 @@ class Job(ABC):
         sandbox_creator: Optional[Callable[[], BaseSandbox]] = None,
         upstreams: Optional[list['Job']] = None,
     ):
-        self.id = str(uuid.uuid4())
+        # self.id = str(uuid.uuid4())
+        self.id = '123'
         self.name = name
         self.result = None
         self._upstreams: list[Job] = []

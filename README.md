@@ -67,6 +67,7 @@ Modular and composable: Jobs can form larger DAGs via Projects
     - Docker runner
     - K8s runner
 - Sandbox
+    - Block disk, network, env access (python job part should be considered)
     - Container
         - Docker
         - Podman

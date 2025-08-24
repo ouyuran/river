@@ -41,7 +41,7 @@ class River:
         self.default_sandbox_config = default_sandbox_config
         self.max_parallel_jobs = max_parallel_jobs
         self._default_sandbox_creator = None
-        self.set_status(Status.PENDING)
+        self.set_status(Status.PENDING) # TODO, should move to flow?
 
 
     def set_status(self, status: Status, exception: Optional[Exception] = None):
