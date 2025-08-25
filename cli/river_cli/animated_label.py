@@ -54,8 +54,8 @@ class AnimatedLabel:
         # Use fixed width for status to ensure consistent alignment
         max_status_length = max(len(s.value) for s in Status)
         max_time_display_length = len("xxh xxm xxs")
-        status_padded = f"{self._status.value:<{max_status_length}}"
-        time_display_padded = f"{self._status.value:<{max_time_display_length}}"
+        status_padded = f"{self._status:<{max_status_length}}"
+        time_display_padded = f"{self._status:<{max_time_display_length}}"
         status_time_part = f"({status_padded}) {time_display_padded}"
         
         dots_needed = available_width - len(name_part) - len(status_time_part)
@@ -75,7 +75,8 @@ class AnimatedLabel:
     @property
     def icon(self) -> str:
         """Get the icon based on item type"""
-        return self.get_icon(self.item_type.value)
+        # item_type is now a string (due to use_enum_values = True)
+        return self.get_icon(self.item_type)
     
     @property
     def color(self) -> str:
@@ -125,7 +126,7 @@ class AnimatedLabel:
     def status_time_part(self) -> str:
         """Get formatted status and time part"""
         max_status_length = max(len(s.value) for s in Status)
-        status_padded = f"{self._status.value:<{max_status_length}}"
+        status_padded = f"{self._status:<{max_status_length}}"
         return f"{status_padded} {self.time_display}"
     
     def update_from_item(self, item: StatusBase):
@@ -183,7 +184,7 @@ class AnimatedLabel:
         
         # Add status and time with consistent padding
         max_status_length = max(len(s.value) for s in Status)
-        status_padded = f"{self._status.value:<{max_status_length}}"
+        status_padded = f"{self._status:<{max_status_length}}"
         status_part = f"({status_padded}) {self.time_display}"
         text.append(status_part)
         
@@ -194,4 +195,4 @@ class AnimatedLabel:
     
     def __str__(self) -> str:
         """String representation for debugging."""
-        return f"AnimatedLabel({self.name}, {self._status.value})"
+        return f"AnimatedLabel({self.name}, {self._status})"

@@ -14,6 +14,10 @@ class StatusBase(BaseModel):
     error: Optional[str] = None
     error_type: Optional[str] = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    class Config:
+        # Allow enum deserialization from string values
+        use_enum_values = True
 
     def set_status(self, status: Status):
         self.status = status
@@ -34,10 +38,10 @@ class StatusBase(BaseModel):
         print(self.model_dump_json(), flush=True)
 
 class RiverStatus(StatusBase):
-    type: Literal[ModuleTypes.RIVER] = ModuleTypes.RIVER
+    type: ModuleTypes = ModuleTypes.RIVER
 
 class JobStatus(StatusBase):
-    type: Literal[ModuleTypes.JOB] = ModuleTypes.JOB
+    type: ModuleTypes = ModuleTypes.JOB
 
 class TaskStatus(StatusBase):
-    type: Literal[ModuleTypes.TASK] = ModuleTypes.TASK
+    type: ModuleTypes = ModuleTypes.TASK

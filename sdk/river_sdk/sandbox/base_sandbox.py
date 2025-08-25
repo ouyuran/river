@@ -84,7 +84,7 @@ class BaseSandboxManager(ABC):
         pass
     
     @abstractmethod
-    def set_job_status_to_sandbox(self, status: JobStatus) -> None:
+    def set_job_status_to_sandbox(self, sandbox: BaseSandbox, status: JobStatus) -> None:
         """Set job status to a sandbox instance."""
         pass
 

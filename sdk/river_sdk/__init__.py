@@ -2,7 +2,7 @@ from .job import Job, JobContext
 from .river import River, RiverContext, default_sandbox_creator, sandbox_forker
 from .task import bash
 from .sandbox import DockerSandbox, DockerSandboxManager, BaseSandbox, BaseSandboxManager
-from .fingerprint import fingerprint
+from .fingerprint import get_fp
 
 __all__ = [
     "Job", 
@@ -16,5 +16,5 @@ __all__ = [
     "BaseSandboxManager",
     "default_sandbox_creator",
     "sandbox_forker",
-    "fingerprint",
+    "get_fp",
 ]

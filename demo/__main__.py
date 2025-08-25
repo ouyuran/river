@@ -42,29 +42,23 @@ def main():
         # TODO, if none should use default
         sandbox_creator=default_sandbox_creator(),
     )
-    print(f"fingerprint: {fingerprint(job1)}")
-    # print(f"joblib:      {joblib.hash(job1)}")
-    print(f"dill:        {hashlib.sha1(dill.dumps(job1)).hexdigest()}")
 
-    # job2 = CatHelloFileJob(
-    #     "cat_hello_file",
-    #     create_job=job1,
-    # )
-    # fingerprint(CatHelloFileJob)
-    # fingerprint(job2)
+    job2 = CatHelloFileJob(
+        "cat_hello_file",
+        create_job=job1,
+    )
 
-    # river = River(
-    #     "hello_reiver",
-    #     sandbox_manager=DockerSandboxManager(),
-    #     default_sandbox_config="ubuntu",
-    #     outlets={
-    #         "default": job2,
-    #         "only_create": job1
-    #     }
-    # )
+    river = River(
+        "hello_reiver",
+        sandbox_manager=DockerSandboxManager(),
+        default_sandbox_config="ubuntu",
+        outlets={
+            "default": job2,
+            "only_create": job1
+        }
+    )
     
-
-    # river.flow()
+    river.flow()
 
 if __name__ == "__main__":
     main()

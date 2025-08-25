@@ -1,5 +1,6 @@
 import uuid
 import shlex
+import base64
 
 from fabric import Connection
 from functools import partial
@@ -31,7 +32,6 @@ class DockerSandbox(BaseSandbox):
     ) -> Result:
         """Generate docker exec command"""
         docker_cmd = f"docker exec"
-        
         # Add environment variables (with safe escaping)
         if env:
             for key, value in env.items():
@@ -102,8 +102,8 @@ class DockerSandboxManager(BaseSandboxManager):
 
     def destory(self, sandbox: DockerSandbox) -> None:
         """Stop and remove the Docker container."""
-        self._executor.run(f"docker stop -t 0 {sandbox.id}")
-        self._executor.run(f"docker rm {sandbox.id}")
+        # self._executor.run(f"docker stop -t 0 {sandbox.id}")
+        # self._executor.run(f"docker rm {sandbox.id}")
 
     def _get_tag(self, fingerprint:str) -> str:
         return f"river-sandbox:{fingerprint}"
@@ -124,22 +124,36 @@ class DockerSandboxManager(BaseSandboxManager):
             "docker images --format",
             "'{{.Repository}}:{{.Tag}}'",
             "|",
-            "grep -w '",
-            tag,
-            "'",
+            f"grep -w '{tag}'"
         ]))
         return result.ok
     
     def set_job_status_to_sandbox(self, sandbox: DockerSandbox, status: JobStatus) -> None:
         status_json = status.model_dump_json()
-        self._executor.run(f"docker exec {sandbox.id} echo {status_json} > {JOB_STATUS_FILE}")
-        pass
-    
+        print(status_json)
+        
+        # Encode JSON as base64 to avoid shell escaping issues
+        encoded_json = base64.b64encode(status_json.encode()).decode()
+        safe_container_id = shlex.quote(sandbox.id)
+        safe_job_status_file = shlex.quote(JOB_STATUS_FILE)
+        
+        # Store base64 encoded JSON directly
+        command = f"docker exec {safe_container_id} sh -c 'echo {encoded_json} > {safe_job_status_file}'"
+        print(command)
+        result = self._executor.run(command)
+        print(result)
+        if not result.ok:
+            msg = f"Cannot set job status: {result.stderr}"
+            raise RuntimeError(msg)
+
     def get_job_status_from_snapshot(self, fingerprint: str) -> JobStatus:
         tag = self._get_tag(fingerprint)
         result = self._executor.run(f"docker run {tag} cat {JOB_STATUS_FILE}")
         if result.ok:
-            return JobStatus.model_validate_json(result.stdout)
+            # Decode base64 encoded JSON
+            encoded_json = result.stdout.strip()
+            status_json = base64.b64decode(encoded_json).decode()
+            return JobStatus.model_validate_json(status_json)
         else:
             msg = f"Cannot get cached job status from {fingerprint=}, {result.stderr}"
             raise RuntimeError(msg)

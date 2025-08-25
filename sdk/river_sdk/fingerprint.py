@@ -42,7 +42,7 @@ def should_pickle_by_reference_with_record(obj, name=None) -> bool:
 
     return result
 
-def fingerprint(obj: Any) -> str:
+def get_fp(obj: Any) -> str:
     global pickle_by_reference_modules
     pickle_by_reference_modules = {}
     

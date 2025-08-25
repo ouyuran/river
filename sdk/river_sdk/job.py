@@ -5,7 +5,8 @@ import cloudpickle
 import hashlib
 import sys
 import uuid
-from river_sdk.sandbox.base_sandbox import BaseSandbox
+from river_sdk.sandbox import BaseSandbox
+from river_sdk.fingerprint import get_fp
 from river_common.status import JobStatus
 from river_common.shared import Status
 
@@ -36,8 +37,6 @@ class Job(ABC):
         sandbox_creator: Optional[Callable[[], BaseSandbox]] = None,
         upstreams: Optional[list['Job']] = None,
     ):
-        # self.id = str(uuid.uuid4())
-        self.id = '123'
         self.name = name
         self.result = None
         self._upstreams: list[Job] = []
@@ -52,27 +51,12 @@ class Job(ABC):
             self._join(upstreams)
 
     @property
-    def fingerprint(self) -> str:
-        """Get hash value for cache mechanism."""
-        from river_sdk.river import get_current_river
-        # return hashlib.sha1(b''.join([
-        #     sys.version.encode(),
-        #     cloudpickle.dumps(get_current_river()),
-        #     cloudpickle.dumps(self),
-        # ])).hexdigest()
-        sys_version = sys.version.encode()
-        river_context = cloudpickle.dumps(get_current_river())
-        job_context = cloudpickle.dumps(self)
-        print(sys_version)
-        print(river_context)
-        print(job_context)
-        hash_value = hashlib.sha1(b''.join([
-            sys_version,
-            river_context,
-            job_context
-        ])).hexdigest()
-        print(hash_value)
-        return hash_value
+    def id(self) -> str:
+        # Generate deterministic UUID based on object memory address
+        # Same instance will always produce the same UUID
+        namespace = uuid.NAMESPACE_OID
+        obj_id = f"job-{id(self)}"
+        return str(uuid.uuid5(namespace, obj_id))
 
     def set_status(self, status: Status, exception: Optional[Exception] = None):
         """Set the job status and export"""
@@ -85,7 +69,7 @@ class Job(ABC):
             id=self.id,
             name=self.name,
             parent_id=get_current_river().id,
-            status=status
+            status=status,
         )
         
         if status == Status.FAILED and exception:
@@ -105,11 +89,12 @@ class Job(ABC):
             raise RuntimeError(f"Job '{self.name}' is already running.")
         
         current_sandbox_manager = get_current_sandbox_manager()
-        fingerprint = self.fingerprint
-
-        if current_sandbox_manager.snapshot_exists(fingerprint):
-            print("😄")
-            cached_job_status = current_sandbox_manager.get_job_status_from_snapshot(fingerprint)
+        fp = get_fp(self)
+        print("😄")
+        print(fp)
+        if current_sandbox_manager.snapshot_exists(fp):
+            print("😄😄")
+            cached_job_status = current_sandbox_manager.get_job_status_from_snapshot(fp)
             cached_job_status.export()
             return
             # TODO
@@ -121,8 +106,19 @@ class Job(ABC):
                     self.sandbox = self._sandbox_creator()
                 with JobContext(self):
                     self._execute_main()
+                    from river_sdk.river import get_current_river
+                    print('🚗')
+                    current_sandbox_manager.set_job_status_to_sandbox(
+                        self.sandbox,
+                        JobStatus(
+                            id=self.id,
+                            name=self.name,
+                            parent_id=get_current_river().id,
+                            status=self.status,
+                        )
+                    )
                 if self.sandbox:
-                    current_sandbox_manager.take_snapshot(self.sandbox, fingerprint)
+                    current_sandbox_manager.take_snapshot(self.sandbox, fp)
             except Exception as e:
                 self.result = None
                 self.error = e
