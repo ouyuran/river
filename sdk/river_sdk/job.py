@@ -27,6 +27,20 @@ class JobContext():
     @staticmethod
     def get_current():
         return JobContext.context.get()
+    
+
+class JobResult():
+    def __init__(self, status: Status, origan_job_id: str, main_return: Any = None):
+        self.status = status
+        self.origan_job_id = origan_job_id
+        self.main_return = main_return
+
+    @property
+    def ok(self) -> bool:
+        return self.status == Status.SUCCESS
+    
+    def is_cache(self, job_id: str) -> bool:
+        return self.origan_job_id == job_id
 
 
 class Job(ABC):
@@ -38,7 +52,7 @@ class Job(ABC):
         upstreams: Optional[list['Job']] = None,
     ):
         self.name = name
-        self.result = None
+        self.result: Optional[JobResult] = None
         self._upstreams: list[Job] = []
         self.status = Status.PENDING
         self.sandbox: Any = None  # Use Any to avoid forcing users to specify generic types
@@ -64,9 +78,11 @@ class Job(ABC):
         
         # Import here to avoid circular dependency
         from river_sdk.river import get_current_river
-        
+        print("@@@@")
+        print(self.result)
         job_status = JobStatus(
             id=self.id,
+            origan_id=self.result.origan_job_id if self.result else None,
             name=self.name,
             parent_id=get_current_river().id,
             status=status,
@@ -76,6 +92,9 @@ class Job(ABC):
             job_status.set_failed(exception)
         
         job_status.export()
+    
+    def should_cache_result(self) -> bool:
+        return self.result is not None and self.result.ok
 
     @abstractmethod
     def main(self) -> Any:
@@ -89,45 +108,41 @@ class Job(ABC):
             raise RuntimeError(f"Job '{self.name}' is already running.")
         
         current_sandbox_manager = get_current_sandbox_manager()
-        fp = get_fp(self)
-        print("😄")
-        print(fp)
-        if current_sandbox_manager.snapshot_exists(fp):
-            print("😄😄")
-            cached_job_status = current_sandbox_manager.get_job_status_from_snapshot(fp)
-            cached_job_status.export()
-            return
-            # TODO
-            # return cached_job_status.status, cached_job_status.result, cached_job_status.error
         
         if not self._run_already_finished() and not self._should_skip_due_to_upstream():
             try:
+                fp = get_fp(self)
+                print("😄, fp " + fp)
+                if current_sandbox_manager.snapshot_exists(fp):
+                    print("😄😄, cache " + self.name)
+                    cached_job_result = current_sandbox_manager.get_job_result_from_snapshot(fp)
+                    self.result = cached_job_result
+                    self.set_status(cached_job_result.status)
+                    return
                 if self._sandbox_creator:
                     self.sandbox = self._sandbox_creator()
                 with JobContext(self):
                     self._execute_main()
-                    from river_sdk.river import get_current_river
-                    print('🚗')
-                    current_sandbox_manager.set_job_status_to_sandbox(
+                print('🚗')
+                if self.result and self.should_cache_result():
+                    current_sandbox_manager.set_job_result_to_sandbox(
                         self.sandbox,
-                        JobStatus(
-                            id=self.id,
-                            name=self.name,
-                            parent_id=get_current_river().id,
-                            status=self.status,
-                        )
+                        self.result,
                     )
                 if self.sandbox:
                     current_sandbox_manager.take_snapshot(self.sandbox, fp)
             except Exception as e:
-                self.result = None
+                self.result = JobResult(
+                    status=Status.FAILED,
+                    origan_job_id=self.id,
+                )
                 self.error = e
                 self.set_status(Status.FAILED, e)
             finally:
                 if self.sandbox:
                     current_sandbox_manager.destory(self.sandbox)
-
-        return self.status, self.result, self.error
+        # TODO, what should be the return of run?
+        # return self.status, self.result, self.error
 
     def _join(self, upstreams: list['Job']):
         for job in upstreams:
@@ -161,15 +176,22 @@ class Job(ABC):
         for job in self._upstreams:
             job.run()
             if job.status in (Status.FAILED, Status.SKIPPED):
-                self.result = None
+                self.result = JobResult(
+                    status=Status.SKIPPED,
+                    origan_job_id=self.id,
+                )
                 self.set_status(Status.SKIPPED)
                 return True
         return False
 
     def _execute_main(self):
         self.set_status(Status.RUNNING)
-        result = self.main()
-        self.result = result
+        r = self.main()
+        self.result = JobResult(
+            status=Status.SUCCESS,
+            origan_job_id=self.id,
+            main_return=r,
+        )
         self.set_status(Status.SUCCESS)
 
 

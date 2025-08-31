@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional, TypeVar, TYPE_CHECKING
 from functools import partial
@@ -5,7 +7,7 @@ from invoke.runners import Result
 from river_common.status import JobStatus
 
 if TYPE_CHECKING:
-    from river_sdk.job import Job
+    from river_sdk.job import Job, JobResult
 
 T = TypeVar('T', bound='BaseSandbox')
 
@@ -84,11 +86,11 @@ class BaseSandboxManager(ABC):
         pass
     
     @abstractmethod
-    def set_job_status_to_sandbox(self, sandbox: BaseSandbox, status: JobStatus) -> None:
-        """Set job status to a sandbox instance."""
+    def set_job_result_to_sandbox(self, sandbox: BaseSandbox, result: JobResult) -> None:
+        """Set job result to a sandbox instance."""
         pass
 
     @abstractmethod
-    def get_job_status_from_snapshot(self, fingerprint: str) -> JobStatus:
-        """Get job status from a snapshot with given fingerprint."""
+    def get_job_result_from_snapshot(self, fingerprint: str) -> JobResult:
+        """Get job result from a snapshot with given fingerprint."""
         pass

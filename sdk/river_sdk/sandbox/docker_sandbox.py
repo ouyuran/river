@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import uuid
 import shlex
 import base64
+import cloudpickle
 
 from fabric import Connection
 from functools import partial
@@ -11,7 +14,7 @@ from river_sdk.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
 from river_common.status import JobStatus
 
 if TYPE_CHECKING:
-    from river_sdk.job import Job
+    from river_sdk.job import Job, JobResult
 
 RIVER_ROOT = "/river"
 JOB_STATUS_FILE = f"{RIVER_ROOT}/job_status"
@@ -128,32 +131,28 @@ class DockerSandboxManager(BaseSandboxManager):
         ]))
         return result.ok
     
-    def set_job_status_to_sandbox(self, sandbox: DockerSandbox, status: JobStatus) -> None:
-        status_json = status.model_dump_json()
-        print(status_json)
+    def set_job_result_to_sandbox(self, sandbox: DockerSandbox, job_result: JobResult) -> None:
+        result_binary = cloudpickle.dumps(job_result)
         
-        # Encode JSON as base64 to avoid shell escaping issues
-        encoded_json = base64.b64encode(status_json.encode()).decode()
+        encoded_result_binary = base64.b64encode(result_binary).decode()
         safe_container_id = shlex.quote(sandbox.id)
         safe_job_status_file = shlex.quote(JOB_STATUS_FILE)
         
-        # Store base64 encoded JSON directly
-        command = f"docker exec {safe_container_id} sh -c 'echo {encoded_json} > {safe_job_status_file}'"
+        command = f"docker exec {safe_container_id} sh -c 'echo {encoded_result_binary} > {safe_job_status_file}'"
         print(command)
         result = self._executor.run(command)
         print(result)
         if not result.ok:
-            msg = f"Cannot set job status: {result.stderr}"
+            msg = f"Cannot set job result: {result.stderr}"
             raise RuntimeError(msg)
 
-    def get_job_status_from_snapshot(self, fingerprint: str) -> JobStatus:
+    def get_job_result_from_snapshot(self, fingerprint: str) -> JobResult:
         tag = self._get_tag(fingerprint)
         result = self._executor.run(f"docker run {tag} cat {JOB_STATUS_FILE}")
         if result.ok:
-            # Decode base64 encoded JSON
-            encoded_json = result.stdout.strip()
-            status_json = base64.b64decode(encoded_json).decode()
-            return JobStatus.model_validate_json(status_json)
+            encoded_result_binary = result.stdout.strip().encode()
+            result_binary = base64.b64decode(encoded_result_binary)
+            return cloudpickle.loads(result_binary)
         else:
-            msg = f"Cannot get cached job status from {fingerprint=}, {result.stderr}"
+            msg = f"Cannot get cached job result from {fingerprint=}, {result.stderr}"
             raise RuntimeError(msg)

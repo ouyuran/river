@@ -4,6 +4,7 @@ from python_utils import to_int
 import joblib
 import dill
 import hashlib
+import base64
 
 NUM = 2
 
@@ -13,9 +14,12 @@ class CreateHelloFileJob(Job):
 
     def main(self):
         a = to_int(f"{NUM}")
-        bash("echo 'Hello, river!' > hello_river.txt")
+        bash("echo 'Hello, river12!' > hello_river.txt")
         bash("mkdir /test")
         bash("touch /test/aaa")
+        def test_print():
+            print("========================test")
+        return test_print
 
     def dumps(self):
         return cloudpickle.dumps(self)
@@ -27,7 +31,8 @@ class CatHelloFileJob(Job):
             sandbox_creator=sandbox_forker(create_job),
             upstreams=[create_job]
         )
-
+        self.create_job = create_job
+    # TODO, downstream job cannot be cached
     def main(self):
         result = bash("cat hello_river.txt")
         print(result)
@@ -35,6 +40,9 @@ class CatHelloFileJob(Job):
         print(result)
         result = bash("echo $TEST_ENV", env={"TEST_ENV": "test env"})
         print(result)
+        # if self.create_job.result:
+        #     self.create_job.result.main_return()
+        
 
 def main():
     job1 = CreateHelloFileJob(
@@ -44,7 +52,7 @@ def main():
     )
 
     job2 = CatHelloFileJob(
-        "cat_hello_file",
+        "cat",
         create_job=job1,
     )
 

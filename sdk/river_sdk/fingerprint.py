@@ -61,13 +61,3 @@ def get_fp(obj: Any) -> str:
     cp._should_pickle_by_reference = _origin_should_pickle_by_reference
 
     return hashlib.sha1(bytes).hexdigest()
-
-# TODO, TEST
-# import moudel
-# import function
-# import class
-# global variable
-# dynamic import
-# lambda function
-# dynamic function
-# dynamic class

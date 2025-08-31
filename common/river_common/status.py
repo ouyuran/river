@@ -7,6 +7,7 @@ from river_common.shared import ModuleTypes, Status
 
 class StatusBase(BaseModel):
     id: str
+    origan_id: Optional[str] = None
     name: str
     parent_id: str | None = None
     status: Status = Status.PENDING
@@ -33,6 +34,9 @@ class StatusBase(BaseModel):
         if exception:
             self.error = str(exception)
             self.error_type = exception.__class__.__name__
+
+    def is_cache(self) -> bool:
+        return self.id == self.origan_id
 
     def export(self):
         print(self.model_dump_json(), flush=True)
