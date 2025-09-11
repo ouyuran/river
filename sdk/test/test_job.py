@@ -1,7 +1,9 @@
 import pytest
-from sdk.river_sdk.job import Job, JobContext, get_current_job, JobContextError
+from river_sdk.job import Job, JobContext, get_current_job, JobContextError
+from river_sdk.river import River, RiverContext
+from river_sdk.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
 from unittest.mock import Mock, patch
-from sdk.river_sdk.sandbox.base_sandbox import BaseSandbox
+from river_common.shared import Status
 
 
 # Concrete Job implementations for testing
@@ -43,53 +45,70 @@ class UpstreamAwareJob(Job):
 
 class TestJob:
 
+    @pytest.fixture
+    def river_context(self):
+        """Fixture that provides a RiverContext with mocked sandbox manager."""
+        mock_manager = Mock(spec=BaseSandboxManager)
+        mock_manager.snapshot_exists.return_value = False
+        # Create a proper JobResult mock instead of None to avoid serialization issues
+        from river_sdk.job import JobResult
+        mock_job_result = JobResult(Status.SUCCESS, "test_job_id")
+        mock_manager.get_job_result_from_snapshot.return_value = mock_job_result
+        mock_manager.set_job_result_to_sandbox.return_value = None
+        mock_manager.take_snapshot.return_value = "snapshot_id"
+        mock_manager.destory.return_value = None
+        
+        # Create a mock job for the river outlets
+        mock_river_job = SimpleJob("river_job", "river_result")
+        
+        river = River(
+            name="test-river",
+            sandbox_manager=mock_manager,
+            outlets={"default": mock_river_job}
+        )
+        
+        with RiverContext(river):
+            yield river
+
     def test_job_init(self):
         a = SimpleJob('a', 'A')
         assert a.name == 'a'
-        assert a.status == Job.Status.PENDING
+        assert a.status == Status.PENDING
         assert a.result is None
         assert a.error is None
 
 
-    def test_job_run(self):
-        a = SimpleJob('a', 'A')
-        status, result, error = a.run() 
-
-        assert a.name == 'a'
-        assert a.status == Job.Status.SUCCESS
-        assert a.result == 'A'
-        assert result == 'A'
-        assert status == Job.Status.SUCCESS
-        assert error == None
-
-
-    def test_job_run_failed(self):
-        a = FailingJob('a', "Failed")
-
-        status, result, error = a.run()
-
-        assert a.status == Job.Status.FAILED
-        assert a.result is None
-        assert result is None
-        assert status == Job.Status.FAILED
-        assert a.error is not None
-        assert str(a.error) == "Failed"
-        assert str(error) == "Failed"
-
-    def test_job_run_already_running(self):
+    def test_job_run(self, river_context):
         a = SimpleJob('a', 'A')
         a.run()
-        # run again should not raise, should return (status, result)
-        status, result, _ = a.run()
-        assert result == 'A'
-        assert status == Job.Status.SUCCESS
-        assert a.status == Job.Status.SUCCESS
+
+        assert a.name == 'a'
+        assert a.status == Status.SUCCESS
+        assert a.result.main_return == 'A'
 
 
-    def test_job_chain_runs(self):
+    def test_job_run_failed(self, river_context):
+        a = FailingJob('a', "Failed")
+        a.run()
+
+        assert a.status == Status.FAILED
+        assert a.result.status == Status.FAILED
+        assert a.error is not None
+        assert str(a.error) == "Failed"
+
+    def test_job_run_already_running(self, river_context):
+        a = SimpleJob('a', 'A')
+        a.run()
+        # run again should not raise since job is already finished
+        a.run()
+        assert a.result.main_return == 'A'
+        assert a.status == Status.SUCCESS
+
+
+    def test_job_chain_runs(self, river_context):
         b_holder = {}
         def a_main():
-            assert b_holder['b'].status == Job.Status.PENDING
+            assert b_holder['b'].status == Status.PENDING
             return 'A'
         a = CallbackJob('a', a_main)
         b = SimpleJob('b', 'B', upstreams=[a])
@@ -97,23 +116,21 @@ class TestJob:
 
         b.run()
 
-        assert a.status == Job.Status.SUCCESS
-        assert b.status == Job.Status.SUCCESS
+        assert a.status == Status.SUCCESS
+        assert b.status == Status.SUCCESS
 
 
-    def test_job_upstream_fail_downstream_skip(self):
+    def test_job_upstream_fail_downstream_skip(self, river_context):
         a = FailingJob('a', "fail a")
         b = SimpleJob('b', 'B', upstreams=[a])
 
-        status, result, _ = b.run()
+        b.run()
 
-        assert a.status == Job.Status.FAILED
-        assert b.status == Job.Status.SKIPPED
-        assert result is None
-        assert status == Job.Status.SKIPPED
+        assert a.status == Status.FAILED
+        assert b.status == Status.SKIPPED
 
 
-    def test_job_main_param_not_match_upstream(self):
+    def test_job_main_param_not_match_upstream(self, river_context):
         # This test needs to be updated since Job.main() doesn't take upstream parameters anymore
         # The upstream values would need to be accessed differently in the new architecture
         a = SimpleJob('a', '1')
@@ -122,8 +139,8 @@ class TestJob:
         
         # This test may not be relevant anymore with the new architecture
         # where main() doesn't receive upstream parameters directly
-        status, result, _ = c.run()
-        assert status == Job.Status.SUCCESS
+        c.run()
+        assert c.status == Status.SUCCESS
 
 
     def test_job_cycle_detection_raises(self):
@@ -134,7 +151,7 @@ class TestJob:
             a._join([b])
 
 
-    def test_job_diamond_dependency(self):
+    def test_job_diamond_dependency(self, river_context):
         """
         a
         / \\
@@ -155,18 +172,38 @@ class TestJob:
         d.run()
 
         assert fn_call_count == 1
-        assert a.status == Job.Status.SUCCESS
-        assert b.status == Job.Status.SUCCESS
-        assert d.status == Job.Status.SUCCESS
-        assert c.status == Job.Status.SUCCESS
+        assert a.status == Status.SUCCESS
+        assert b.status == Status.SUCCESS
+        assert d.status == Status.SUCCESS
+        assert c.status == Status.SUCCESS
 
 
 class TestJobSandbox:
 
     @pytest.fixture
-    def mock_manager(self):
-        """Fixture for mocked sandbox manager."""
-        return Mock()
+    def river_context(self):
+        """Fixture that provides a RiverContext with mocked sandbox manager."""
+        mock_manager = Mock(spec=BaseSandboxManager)
+        mock_manager.snapshot_exists.return_value = False
+        # Create a proper JobResult mock instead of None to avoid serialization issues
+        from river_sdk.job import JobResult
+        mock_job_result = JobResult(Status.SUCCESS, "test_job_id")
+        mock_manager.get_job_result_from_snapshot.return_value = mock_job_result
+        mock_manager.set_job_result_to_sandbox.return_value = None
+        mock_manager.take_snapshot.return_value = "snapshot_id"
+        mock_manager.destory.return_value = None
+        
+        # Create a mock job for the river outlets
+        mock_river_job = SimpleJob("river_job", "river_result")
+        
+        river = River(
+            name="test-river",
+            sandbox_manager=mock_manager,
+            outlets={"default": mock_river_job}
+        )
+        
+        with RiverContext(river):
+            yield river
 
     @pytest.fixture
     def mock_sandbox(self):
@@ -195,39 +232,43 @@ class TestJobSandbox:
         assert job._sandbox_creator is None
         assert job.sandbox is None
 
-    @patch('sdk.river_sdk.river.get_current_sandbox_manager')
-    def test_job_run_creates_sandbox(self, mock_get_manager, mock_manager, mock_sandbox, mock_sandbox_creator):
+    @patch('cloudpickle.dumps')
+    @patch('cloudpickle.loads') 
+    def test_job_run_creates_sandbox(self, mock_loads, mock_dumps, river_context, mock_sandbox, mock_sandbox_creator):
         # Test that running a job creates sandbox when sandbox_creator is provided
-        mock_get_manager.return_value = mock_manager
+        # Mock cloudpickle to avoid serialization issues with Mock objects
+        mock_dumps.return_value = b'fake_serialized_data'
+        mock_loads.return_value = Mock()
+        
         job = SimpleJob('test_job', 'result', sandbox_creator=mock_sandbox_creator)
         
-        status, result, _ = job.run()
+        job.run()
         
         mock_sandbox_creator.assert_called_once()
         assert job.sandbox is mock_sandbox
-        assert status == Job.Status.SUCCESS
-        assert result == 'result'
-        mock_manager.take_snapshot.assert_called_once_with(mock_sandbox)
-        mock_manager.destory.assert_called_once_with(mock_sandbox)
+        assert job.status == Status.SUCCESS
+        assert job.result.main_return == 'result'
+        river_context.sandbox_manager.destory.assert_called_once_with(mock_sandbox)
 
-    @patch('sdk.river_sdk.river.get_current_sandbox_manager')
-    def test_job_run_without_sandbox_creator(self, mock_get_manager, mock_manager):
+    def test_job_run_without_sandbox_creator(self, river_context):
         # Test that running a job without sandbox_creator doesn't create sandbox
-        mock_get_manager.return_value = mock_manager
         job = SimpleJob('test_job', 'result')
         
-        status, result, _ = job.run()
+        job.run()
         
         assert job.sandbox is None
-        assert status == Job.Status.SUCCESS
-        assert result == 'result'
-        mock_manager.take_snapshot.assert_not_called()
-        mock_manager.destory.assert_not_called()
+        assert job.status == Status.SUCCESS
+        assert job.result.main_return == 'result'
+        river_context.sandbox_manager.take_snapshot.assert_not_called()
+        river_context.sandbox_manager.destory.assert_not_called()
 
-    @patch('sdk.river_sdk.river.get_current_sandbox_manager')
-    def test_job_sandbox_available_in_main(self, mock_get_manager, mock_manager, mock_sandbox, mock_sandbox_creator):
+    @patch('cloudpickle.dumps')
+    @patch('cloudpickle.loads')
+    def test_job_sandbox_available_in_main(self, mock_loads, mock_dumps, river_context, mock_sandbox, mock_sandbox_creator):
         # Test that sandbox is available in main function through self parameter
-        mock_get_manager.return_value = mock_manager
+        # Mock cloudpickle to avoid serialization issues with Mock objects
+        mock_dumps.return_value = b'fake_serialized_data'
+        mock_loads.return_value = Mock()
         
         def main_callback(job_self):
             assert job_self.sandbox is mock_sandbox
@@ -235,23 +276,23 @@ class TestJobSandbox:
         
         job = UpstreamAwareJob('test_job', main_callback, sandbox_creator=mock_sandbox_creator)
         
-        status, result, _ = job.run()
+        job.run()
         
-        assert status == Job.Status.SUCCESS
-        assert result == 'success'
+        assert job.status == Status.SUCCESS
+        assert job.result.main_return == 'success'
         assert job.sandbox is mock_sandbox
-        mock_manager.destory.assert_called_once_with(mock_sandbox)
+        river_context.sandbox_manager.destory.assert_called_once_with(mock_sandbox)
 
-    def test_job_sandbox_creator_exception_fails_job(self):
+    def test_job_sandbox_creator_exception_fails_job(self, river_context):
         # Test that exception in sandbox_creator causes job to fail
         mock_sandbox_creator = Mock(side_effect=Exception("Sandbox creation failed"))
         
         job = SimpleJob('test_job', 'result', sandbox_creator=mock_sandbox_creator)
         
-        status, result, _ = job.run()
+        job.run()
         
-        assert status == Job.Status.FAILED
-        assert result is None
+        assert job.status == Status.FAILED
+        assert job.result.status == Status.FAILED
         assert job.sandbox is None
         assert job.error is not None
         assert str(job.error) == "Sandbox creation failed"

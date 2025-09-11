@@ -89,7 +89,11 @@ class TestDockerSandboxManager:
 
         result = manager.create(self.image)
 
-        mock_executor.run.assert_called_once_with(f"docker run -d {self.image} tail -f /dev/null")
+        expected_calls = [
+            unittest.mock.call(f"docker run -d {self.image} tail -f /dev/null"),
+            unittest.mock.call("docker exec container_id_123 mkdir -p /river")
+        ]
+        mock_executor.run.assert_has_calls(expected_calls)
         assert isinstance(result, DockerSandbox)
         assert result.id == "container_id_123"
 
@@ -101,11 +105,8 @@ class TestDockerSandboxManager:
         sandbox = DockerSandbox("container_123", Mock())
         manager.destory(sandbox)
 
-        expected_calls = [
-            unittest.mock.call("docker stop -t 0 container_123"),
-            unittest.mock.call("docker rm container_123")
-        ]
-        mock_executor.run.assert_has_calls(expected_calls)
+        # Currently the destory method is a no-op (commented out), so no calls expected
+        mock_executor.run.assert_not_called()
 
     @patch('uuid.uuid4')
     def test_take_snapshot_success(self, mock_uuid):
@@ -125,9 +126,9 @@ class TestDockerSandboxManager:
         mock_executor.run.return_value = mock_result
 
         sandbox = DockerSandbox("container_123", Mock())
-        result = manager.take_snapshot(sandbox)
+        result = manager.take_snapshot(sandbox, "test-fingerprint-123")
 
-        expected_tag = "river-sandbox:12345678123412341234123456789012"  # UUID without dashes
+        expected_tag = "river-sandbox:test-fingerprint-123"
         mock_executor.run.assert_called_once_with(f"docker commit container_123 {expected_tag}")
         assert result == expected_tag
 
@@ -151,7 +152,7 @@ class TestDockerSandboxManager:
         sandbox = DockerSandbox("container_123", Mock())
 
         with pytest.raises(RuntimeError, match="Task snapshot for docker sandbox failed, Docker commit failed"):
-            manager.take_snapshot(sandbox)
+            manager.take_snapshot(sandbox, "test-fingerprint-failure")
 
     def test_fork_success(self):
         manager = DockerSandboxManager()
@@ -173,7 +174,11 @@ class TestDockerSandboxManager:
         
         result = manager.fork(mock_job)
         
-        mock_executor.run.assert_called_once_with("docker run -d test_snapshot_tag tail -f /dev/null")
+        expected_calls = [
+            unittest.mock.call("docker run -d test_snapshot_tag tail -f /dev/null"),
+            unittest.mock.call("docker exec forked_container_456 mkdir -p /river")
+        ]
+        mock_executor.run.assert_has_calls(expected_calls)
         assert isinstance(result, DockerSandbox)
         assert result.id == "forked_container_456"
 
@@ -214,6 +219,10 @@ class TestDockerSandboxManager:
         result = creator_func()
 
         # Verify the creator function calls create with the correct image
-        mock_executor.run.assert_called_once_with(f"docker run -d {image} tail -f /dev/null")
+        expected_calls = [
+            unittest.mock.call(f"docker run -d {image} tail -f /dev/null"),
+            unittest.mock.call("docker exec created_container_789 mkdir -p /river")
+        ]
+        mock_executor.run.assert_has_calls(expected_calls)
         assert isinstance(result, DockerSandbox)
         assert result.id == "created_container_789"

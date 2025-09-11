@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch
-from sdk.river_sdk.task import TaskExecutionError, bash
-from sdk.river_sdk.sandbox.base_sandbox import BaseSandbox
+from river_sdk.task import TaskExecutionError, bash
+from river_sdk.sandbox.base_sandbox import BaseSandbox
 
 
 class TestTaskExecutionError:
@@ -69,6 +69,7 @@ class TestBashFunction:
         """Fixture for job without sandbox."""
         mock_job = Mock()
         mock_job.sandbox = None
+        mock_job.id = "test-job-id-123"
         return mock_job
 
     @pytest.fixture  
@@ -77,6 +78,7 @@ class TestBashFunction:
         mock_sandbox = Mock(spec=BaseSandbox)
         mock_job = Mock()
         mock_job.sandbox = mock_sandbox
+        mock_job.id = "test-job-id-456"
         return mock_job, mock_sandbox
 
     @pytest.fixture
@@ -91,12 +93,12 @@ class TestBashFunction:
             return mock_result
         return _create_result
 
-    @patch('sdk.river_sdk.task.get_current_job')
+    @patch('river_sdk.task.get_current_job')
     def test_bash_success_with_local_executor(self, mock_get_current_job, mock_job_no_sandbox):
         """Test bash function success case with LocalCommandExecutor."""
         mock_get_current_job.return_value = mock_job_no_sandbox
         
-        with patch('sdk.river_sdk.task.LocalCommandExecutor') as mock_executor_class:
+        with patch('river_sdk.task.LocalCommandExecutor') as mock_executor_class:
             mock_executor = Mock()
             mock_executor_class.return_value = mock_executor
             
@@ -108,7 +110,7 @@ class TestBashFunction:
                 env={"VAR": "value"}
             )
 
-    @patch('sdk.river_sdk.task.get_current_job')
+    @patch('river_sdk.task.get_current_job')
     def test_bash_success_with_sandbox(self, mock_get_current_job, mock_job_with_sandbox):
         """Test bash function success case with sandbox executor."""
         mock_job, mock_sandbox = mock_job_with_sandbox
@@ -122,14 +124,14 @@ class TestBashFunction:
             env={"PATH": "/usr/bin"}
         )
 
-    @patch('sdk.river_sdk.task.get_current_job')
+    @patch('river_sdk.task.get_current_job')
     def test_bash_failure_with_local_executor_raises_error(self, mock_get_current_job, 
                                                           mock_job_no_sandbox, mock_failed_result):
         """Test bash function failure case with LocalCommandExecutor raises TaskExecutionError."""
         mock_get_current_job.return_value = mock_job_no_sandbox
         failed_result = mock_failed_result(stderr="command not found", exit_code=127)
         
-        with patch('sdk.river_sdk.task.LocalCommandExecutor') as mock_executor_class:
+        with patch('river_sdk.task.LocalCommandExecutor') as mock_executor_class:
             mock_executor = Mock()
             mock_executor.run.return_value = failed_result
             mock_executor_class.return_value = mock_executor
@@ -143,7 +145,7 @@ class TestBashFunction:
             assert error.stderr == "command not found"
             assert error.exit_code == 127
 
-    @patch('sdk.river_sdk.task.get_current_job')
+    @patch('river_sdk.task.get_current_job')
     def test_bash_failure_with_sandbox_raises_error(self, mock_get_current_job, 
                                                    mock_job_with_sandbox, mock_failed_result):
         """Test bash function failure case with sandbox raises TaskExecutionError."""

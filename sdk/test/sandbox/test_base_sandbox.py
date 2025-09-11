@@ -1,6 +1,7 @@
-from typing import Callable
+from typing import Callable, Any
 from invoke.runners import Result
-from sdk.river_sdk.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
+from river_sdk.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
+from river_sdk.job import JobResult
 from unittest.mock import Mock
 
 
@@ -15,20 +16,36 @@ class ConcreteSandbox(BaseSandbox):
 
 class ConcreteSandboxManager(BaseSandboxManager):
     """Concrete implementation for testing BaseSandboxManager"""
-    def creator(self) -> Callable[[], BaseSandbox]:
-        return self.create
+    def creator(self, config: Any = None) -> Callable[[], BaseSandbox]:
+        return lambda: self.create(config)
     
-    def create(self) -> BaseSandbox:
+    def create(self, config: Any = None) -> BaseSandbox:
         return ConcreteSandbox("created_sandbox")
     
-    def fork(self, sandbox: BaseSandbox) -> BaseSandbox:
-        return ConcreteSandbox(f"forked_{sandbox.id}")
+    def fork(self, job) -> BaseSandbox:
+        # For testing, we assume job has sandbox attribute
+        if hasattr(job, 'sandbox') and job.sandbox:
+            return ConcreteSandbox(f"forked_{job.sandbox.id}")
+        elif hasattr(job, 'id'):
+            return ConcreteSandbox(f"forked_{job.id}")
+        else:
+            return ConcreteSandbox("forked_unknown")
     
     def destory(self, sandbox: BaseSandbox) -> None:
         pass
     
-    def take_snapshot(self, sandbox: BaseSandbox) -> str:
-        return f"snapshot_{sandbox.id}"
+    def take_snapshot(self, sandbox: BaseSandbox, fingerprint: str) -> str:
+        return f"snapshot_{sandbox.id}_{fingerprint}"
+    
+    def snapshot_exists(self, fingerprint: str) -> bool:
+        return False
+    
+    def set_job_result_to_sandbox(self, sandbox: BaseSandbox, result: JobResult) -> None:
+        pass
+    
+    def get_job_result_from_snapshot(self, fingerprint: str) -> JobResult:
+        from river_common.shared import Status
+        return JobResult(Status.SUCCESS, "test_job_id")
 
 
 class TestBaseSandbox:
@@ -59,9 +76,10 @@ class TestBaseSandboxManager:
     def test_forker_returns_callable(self):
         # Test that forker returns a callable
         manager = ConcreteSandboxManager()
-        sandbox = ConcreteSandbox("test_sandbox")
+        mock_job = Mock()
+        mock_job.sandbox = ConcreteSandbox("test_sandbox")
         
-        forker_fn = manager.forker(sandbox)
+        forker_fn = manager.forker(mock_job)
         
         assert callable(forker_fn)
     
@@ -69,8 +87,10 @@ class TestBaseSandboxManager:
         # Test that the callable returned by forker actually forks the sandbox
         manager = ConcreteSandboxManager()
         original_sandbox = ConcreteSandbox("original_sandbox")
+        mock_job = Mock()
+        mock_job.sandbox = original_sandbox
         
-        forker_fn = manager.forker(original_sandbox)
+        forker_fn = manager.forker(mock_job)
         forked_sandbox = forker_fn()
         
         assert forked_sandbox.id == "forked_original_sandbox"
@@ -79,9 +99,10 @@ class TestBaseSandboxManager:
     def test_forker_callable_no_arguments(self):
         # Test that the callable returned by forker takes no arguments
         manager = ConcreteSandboxManager()
-        sandbox = ConcreteSandbox("test_sandbox")
+        mock_job = Mock()
+        mock_job.sandbox = ConcreteSandbox("test_sandbox")
         
-        forker_fn = manager.forker(sandbox)
+        forker_fn = manager.forker(mock_job)
         
         # Should be able to call with no arguments
         result = forker_fn()
@@ -90,10 +111,12 @@ class TestBaseSandboxManager:
     def test_forker_preserves_sandbox_type(self):
         # Test that forker preserves the type of the sandbox
         manager = ConcreteSandboxManager()
-        sandbox = ConcreteSandbox("typed_sandbox")
+        original_sandbox = ConcreteSandbox("typed_sandbox")
+        mock_job = Mock()
+        mock_job.sandbox = original_sandbox
         
-        forker_fn = manager.forker(sandbox)
+        forker_fn = manager.forker(mock_job)
         forked_sandbox = forker_fn()
         
-        assert type(forked_sandbox) == type(sandbox)
+        assert type(forked_sandbox) == type(original_sandbox)
         assert isinstance(forked_sandbox, ConcreteSandbox)

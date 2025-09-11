@@ -1,8 +1,9 @@
 import pytest
 from unittest.mock import Mock
-from sdk.river_sdk.river import River, get_current_river, RiverContext, RiverContextError
-from sdk.river_sdk.sandbox.base_sandbox import BaseSandboxManager
-from sdk.river_sdk.job import Job
+from river_sdk.river import River, get_current_river, RiverContext, RiverContextError
+from river_sdk.sandbox.base_sandbox import BaseSandboxManager
+from river_sdk.job import Job
+from river_common.shared import Status
 
 
 # Mock Job classes for testing
@@ -18,6 +19,18 @@ class MockJob(Job):
 
 
 class TestRiver:
+
+    @pytest.fixture
+    def mock_sandbox_manager(self):
+        """Fixture for mocked sandbox manager with all required methods."""
+        mock_manager = Mock(spec=BaseSandboxManager)
+        mock_manager.snapshot_exists.return_value = False
+        mock_manager.get_job_result_from_snapshot.return_value = None
+        mock_manager.set_job_result_to_sandbox.return_value = None
+        mock_manager.take_snapshot.return_value = "snapshot_id"
+        mock_manager.destory.return_value = None
+        return mock_manager
+
     def test_init_stores_all_parameters(self):
         mock_manager = Mock(spec=BaseSandboxManager)
         mock_job = MockJob("test_job")
@@ -53,13 +66,12 @@ class TestRiver:
         assert river.max_parallel_jobs == 1
 
 
-    def test_run_default_outlet(self):
-        mock_manager = Mock(spec=BaseSandboxManager)
+    def test_run_default_outlet(self, mock_sandbox_manager):
         mock_job = MockJob("test_job")
         
         river = River(
             name="test-river",
-            sandbox_manager=mock_manager,
+            sandbox_manager=mock_sandbox_manager,
             outlets={"default": mock_job}
         )
         
@@ -67,14 +79,13 @@ class TestRiver:
         
         assert mock_job.main_called
 
-    def test_run_specific_outlet(self):
-        mock_manager = Mock(spec=BaseSandboxManager)
+    def test_run_specific_outlet(self, mock_sandbox_manager):
         job1 = MockJob("job1")
         job2 = MockJob("job2", upstreams=[job1])
         
         river = River(
             name="test-river",
-            sandbox_manager=mock_manager,
+            sandbox_manager=mock_sandbox_manager,
             outlets={
                 "default": job2,
                 "partial": job1
@@ -87,13 +98,12 @@ class TestRiver:
         assert job1.main_called
         assert not job2.main_called
 
-    def test_run_nonexistent_outlet_raises_error(self):
-        mock_manager = Mock(spec=BaseSandboxManager)
+    def test_run_nonexistent_outlet_raises_error(self, mock_sandbox_manager):
         mock_job = MockJob("test_job")
         
         river = River(
             name="test-river",
-            sandbox_manager=mock_manager,
+            sandbox_manager=mock_sandbox_manager,
             outlets={"default": mock_job}
         )
         
@@ -104,14 +114,24 @@ class TestRiver:
 class TestRiverContext:
     """Test cases for RiverContext class."""
 
-    def test_river_context_sets_and_resets_context(self):
-        """Test RiverContext as context manager sets and resets context properly."""
+    @pytest.fixture
+    def mock_sandbox_manager(self):
+        """Fixture for mocked sandbox manager with all required methods."""
         mock_manager = Mock(spec=BaseSandboxManager)
+        mock_manager.snapshot_exists.return_value = False
+        mock_manager.get_job_result_from_snapshot.return_value = None
+        mock_manager.set_job_result_to_sandbox.return_value = None
+        mock_manager.take_snapshot.return_value = "snapshot_id"
+        mock_manager.destory.return_value = None
+        return mock_manager
+
+    def test_river_context_sets_and_resets_context(self, mock_sandbox_manager):
+        """Test RiverContext as context manager sets and resets context properly."""
         mock_job = MockJob("test_job")
         
         river = River(
             name="test-river",
-            sandbox_manager=mock_manager,
+            sandbox_manager=mock_sandbox_manager,
             outlets={"default": mock_job}
         )
         
@@ -123,26 +143,24 @@ class TestRiverContext:
             # Inside context manager, river should be available
             current = get_current_river()
             assert current is river
-            assert current.sandbox_manager is mock_manager
+            assert current.sandbox_manager is mock_sandbox_manager
         
         # After exiting context, river should be cleared
         with pytest.raises(RiverContextError):
             get_current_river()
 
-    def test_river_context_init(self):
+    def test_river_context_init(self, mock_sandbox_manager):
         """Test RiverContext initialization."""
-        mock_manager = Mock(spec=BaseSandboxManager)
         mock_job = MockJob("test_job")
-        river = River("test-river", mock_manager, {"default": mock_job})
+        river = River("test-river", mock_sandbox_manager, {"default": mock_job})
         
         context = RiverContext(river)
         assert context._river is river
 
-    def test_river_context_get_current_static_method(self):
+    def test_river_context_get_current_static_method(self, mock_sandbox_manager):
         """Test RiverContext.get_current() static method."""
-        mock_manager = Mock(spec=BaseSandboxManager)
         mock_job = MockJob("test_job")
-        river = River("test-river", mock_manager, {"default": mock_job})
+        river = River("test-river", mock_sandbox_manager, {"default": mock_job})
         
         with RiverContext(river):
             # Should return the same river as get_current_river()
@@ -151,11 +169,10 @@ class TestRiverContext:
             assert current_from_context is current_from_function
             assert current_from_context is river
 
-    def test_river_context_exception_cleanup(self):
+    def test_river_context_exception_cleanup(self, mock_sandbox_manager):
         """Test that RiverContext cleans up even if exception occurs inside."""
-        mock_manager = Mock(spec=BaseSandboxManager)
         mock_job = MockJob("test_job")
-        river = River("test-river", mock_manager, {"default": mock_job})
+        river = River("test-river", mock_sandbox_manager, {"default": mock_job})
         
         # Verify context is cleaned up even if exception occurs inside
         with pytest.raises(ValueError):
