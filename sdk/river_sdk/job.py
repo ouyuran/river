@@ -68,6 +68,7 @@ class Job(ABC):
     def id(self) -> str:
         # Generate deterministic UUID based on object memory address
         # Same instance will always produce the same UUID
+        # id cannot be a member attribute, otherwise it would break the consistency of fingerprint
         namespace = uuid.NAMESPACE_OID
         obj_id = f"job-{id(self)}"
         return str(uuid.uuid5(namespace, obj_id))
@@ -78,8 +79,6 @@ class Job(ABC):
         
         # Import here to avoid circular dependency
         from river_sdk.river import get_current_river
-        print("@@@@")
-        print(self.result)
         job_status = JobStatus(
             id=self.id,
             origan_id=self.result.origan_job_id if self.result else None,
@@ -112,9 +111,7 @@ class Job(ABC):
         if not self._run_already_finished() and not self._should_skip_due_to_upstream():
             try:
                 fp = get_fp(self)
-                print("😄, fp " + fp)
                 if current_sandbox_manager.snapshot_exists(fp):
-                    print("😄😄, cache " + self.name)
                     cached_job_result = current_sandbox_manager.get_job_result_from_snapshot(fp)
                     self.result = cached_job_result
                     self.set_status(cached_job_result.status)
@@ -123,7 +120,6 @@ class Job(ABC):
                     self.sandbox = self._sandbox_creator()
                 with JobContext(self):
                     self._execute_main()
-                print('🚗')
                 if self.result and self.should_cache_result():
                     current_sandbox_manager.set_job_result_to_sandbox(
                         self.sandbox,

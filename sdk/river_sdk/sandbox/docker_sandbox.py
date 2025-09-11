@@ -139,9 +139,7 @@ class DockerSandboxManager(BaseSandboxManager):
         safe_job_status_file = shlex.quote(JOB_STATUS_FILE)
         
         command = f"docker exec {safe_container_id} sh -c 'echo {encoded_result_binary} > {safe_job_status_file}'"
-        print(command)
         result = self._executor.run(command)
-        print(result)
         if not result.ok:
             msg = f"Cannot set job result: {result.stderr}"
             raise RuntimeError(msg)

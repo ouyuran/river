@@ -18,6 +18,7 @@ dependencies = [
 test = [
     "pytest>=7.0",
     "pytest-cov",
+    "pytest-sugar",
 ]
 
 [tool.uv.sources]

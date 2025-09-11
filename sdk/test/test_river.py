@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import Mock
-from sdk.src.river import River, get_current_river, RiverContext, RiverContextError
-from sdk.src.sandbox.base_sandbox import BaseSandboxManager
-from sdk.src.job import Job
+from sdk.river_sdk.river import River, get_current_river, RiverContext, RiverContextError
+from sdk.river_sdk.sandbox.base_sandbox import BaseSandboxManager
+from sdk.river_sdk.job import Job
 
 
 # Mock Job classes for testing

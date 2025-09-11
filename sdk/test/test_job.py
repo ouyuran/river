@@ -1,7 +1,7 @@
 import pytest
-from sdk.src.job import Job, JobContext, get_current_job, JobContextError
+from sdk.river_sdk.job import Job, JobContext, get_current_job, JobContextError
 from unittest.mock import Mock, patch
-from sdk.src.sandbox.base_sandbox import BaseSandbox
+from sdk.river_sdk.sandbox.base_sandbox import BaseSandbox
 
 
 # Concrete Job implementations for testing
@@ -195,7 +195,7 @@ class TestJobSandbox:
         assert job._sandbox_creator is None
         assert job.sandbox is None
 
-    @patch('sdk.src.river.get_current_sandbox_manager')
+    @patch('sdk.river_sdk.river.get_current_sandbox_manager')
     def test_job_run_creates_sandbox(self, mock_get_manager, mock_manager, mock_sandbox, mock_sandbox_creator):
         # Test that running a job creates sandbox when sandbox_creator is provided
         mock_get_manager.return_value = mock_manager
@@ -210,7 +210,7 @@ class TestJobSandbox:
         mock_manager.take_snapshot.assert_called_once_with(mock_sandbox)
         mock_manager.destory.assert_called_once_with(mock_sandbox)
 
-    @patch('sdk.src.river.get_current_sandbox_manager')
+    @patch('sdk.river_sdk.river.get_current_sandbox_manager')
     def test_job_run_without_sandbox_creator(self, mock_get_manager, mock_manager):
         # Test that running a job without sandbox_creator doesn't create sandbox
         mock_get_manager.return_value = mock_manager
@@ -224,7 +224,7 @@ class TestJobSandbox:
         mock_manager.take_snapshot.assert_not_called()
         mock_manager.destory.assert_not_called()
 
-    @patch('sdk.src.river.get_current_sandbox_manager')
+    @patch('sdk.river_sdk.river.get_current_sandbox_manager')
     def test_job_sandbox_available_in_main(self, mock_get_manager, mock_manager, mock_sandbox, mock_sandbox_creator):
         # Test that sandbox is available in main function through self parameter
         mock_get_manager.return_value = mock_manager

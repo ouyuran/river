@@ -1,6 +1,6 @@
 from typing import Callable
 from invoke.runners import Result
-from sdk.src.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
+from sdk.river_sdk.sandbox.base_sandbox import BaseSandbox, BaseSandboxManager
 from unittest.mock import Mock
 
 

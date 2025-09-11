@@ -1,7 +1,7 @@
 import pytest
 
 from unittest.mock import Mock, patch
-from sdk.src.sandbox.command_executor import LocalCommandExecutor, RemoteCommandExecutor
+from sdk.river_sdk.sandbox.command_executor import LocalCommandExecutor, RemoteCommandExecutor
 
 
 class TestLocalCommandExecutor:
@@ -9,7 +9,7 @@ class TestLocalCommandExecutor:
     @pytest.fixture
     def mock_connection_setup(self):
         """Setup mock connection for fabric Connection"""
-        with patch('sdk.src.sandbox.command_executor.Connection') as mock_connection:
+        with patch('sdk.river_sdk.sandbox.command_executor.Connection') as mock_connection:
             mock_conn_instance = Mock()
             mock_connection.return_value.__enter__ = Mock(return_value=mock_conn_instance)
             mock_connection.return_value.__exit__ = Mock(return_value=None)
@@ -76,7 +76,7 @@ class TestRemoteCommandExecutor:
     @pytest.fixture
     def mock_connection_setup(self):
         """Setup mock connection for fabric Connection"""
-        with patch('sdk.src.sandbox.command_executor.Connection') as mock_connection:
+        with patch('sdk.river_sdk.sandbox.command_executor.Connection') as mock_connection:
             mock_conn_instance = Mock()
             mock_connection.return_value.__enter__ = Mock(return_value=mock_conn_instance)
             mock_connection.return_value.__exit__ = Mock(return_value=None)
