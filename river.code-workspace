@@ -1,0 +1,33 @@
+{
+    "folders": [
+        {
+            "name": "River Root",
+            "path": "."
+        },
+        {
+            "name": "SDK",
+            "path": "./sdk"
+        },
+        {
+            "name": "CLI", 
+            "path": "./cli"
+        },
+        {
+            "name": "Common",
+            "path": "./common"
+        }
+    ],
+    "settings": {
+        "python.analysis.extraPaths": [
+            "./sdk/src",
+            "./cli/src",
+            "./common"
+        ]
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-python.python",
+            "ms-python.pytest"
+        ]
+    }
+}

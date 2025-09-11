@@ -1,0 +1,11 @@
+{
+    "python.defaultInterpreterPath": "./.venv/bin/python",
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "test",
+        "-v"
+    ],
+    "python.testing.cwd": "${workspaceFolder}",
+    "python.testing.pytestPath": "./.venv/bin/pytest",
+    "python.testing.autoTestDiscoverOnSaveEnabled": true
+}

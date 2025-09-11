@@ -1,0 +1,49 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Demo (__main__.py)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/demo/__main__.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/demo",
+            "python": "${workspaceFolder}/demo/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Debug with uv run",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "runpy",
+            "args": ["__main__"],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/demo",
+            "python": "${workspaceFolder}/demo/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Debug SDK Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["test/", "-v"],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/sdk",
+            "python": "${workspaceFolder}/sdk/.venv/bin/python"
+        },
+        {
+            "name": "Debug CLI",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli/river_cli/main.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/cli",
+            "python": "${workspaceFolder}/cli/.venv/bin/python"
+        }
+    ]
+}
